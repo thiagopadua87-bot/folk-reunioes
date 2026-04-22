@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-folk: #F05A28;
+  --color-folk-light: #FF7A3C;
+  --color-folk-dark: #D44A1A;
+  --font-sans: var(--font-inter);
+}
+
+:root {
+  --background: #F5F5F5;
+  --foreground: #1F2937;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@utility bg-folk-gradient {
+  background: linear-gradient(90deg, var(--color-folk), var(--color-folk-light));
+}
+
+@utility bg-folk-header {
+  background: linear-gradient(90deg, #fff5f2, #ffffff);
+}
