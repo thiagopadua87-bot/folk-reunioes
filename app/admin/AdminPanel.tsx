@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { atualizarStatusUsuario, gerarLinkConfirmacao, resetarSenha } from "./actions";
+import { atualizarStatusUsuario, resetarSenha } from "./actions";
 import type { Profile, UserStatus } from "@/lib/profiles";
 
 const statusLabel: Record<UserStatus, string> = {
@@ -20,9 +20,8 @@ function UserRow({ profile }: { profile: Profile }) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro]           = useState<string | null>(null);
   const [sucesso, setSucesso]     = useState<string | null>(null);
-  const [resetando, setResetando]   = useState(false);
-  const [novaSenha, setNovaSenha]   = useState("");
-  const [linkConfirm, setLinkConfirm] = useState<string | null>(null);
+  const [resetando, setResetando] = useState(false);
+  const [novaSenha, setNovaSenha] = useState("");
 
   function handleAction(status: UserStatus) {
     setErro(null); setSucesso(null);
@@ -31,18 +30,6 @@ function UserRow({ profile }: { profile: Profile }) {
         await atualizarStatusUsuario(profile.id, status);
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Erro ao atualizar.");
-      }
-    });
-  }
-
-  function handleGerarLink() {
-    setErro(null); setSucesso(null); setLinkConfirm(null);
-    startTransition(async () => {
-      try {
-        const link = await gerarLinkConfirmacao(profile.email);
-        setLinkConfirm(link);
-      } catch (e) {
-        setErro(e instanceof Error ? e.message : "Erro ao gerar link.");
       }
     });
   }
@@ -74,68 +61,56 @@ function UserRow({ profile }: { profile: Profile }) {
         {new Date(profile.created_at).toLocaleDateString("pt-BR")}
       </td>
       <td className="py-3.5 pr-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {profile.status !== "aprovado" && (
-            <button onClick={() => handleAction("aprovado")} disabled={isPending}
-              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50">
-              Aprovar
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            {profile.status !== "aprovado" && (
+              <button onClick={() => handleAction("aprovado")} disabled={isPending}
+                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50">
+                Aprovar
+              </button>
+            )}
+            {profile.status !== "recusado" && (
+              <button onClick={() => handleAction("recusado")} disabled={isPending}
+                className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50">
+                Recusar
+              </button>
+            )}
+            {profile.status !== "pendente" && (
+              <button onClick={() => handleAction("pendente")} disabled={isPending}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 disabled:opacity-50">
+                Pendente
+              </button>
+            )}
+          </div>
+
+          {!resetando ? (
+            <button onClick={() => { setResetando(true); setErro(null); setSucesso(null); setNovaSenha(""); }} disabled={isPending}
+              className="self-start rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 disabled:opacity-50">
+              Redefinir senha
             </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={novaSenha}
+                onChange={(e) => setNovaSenha(e.target.value)}
+                placeholder="Nova senha (mín. 6 caracteres)"
+                className="w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-800 outline-none focus:border-folk focus:ring-1 focus:ring-folk/10"
+              />
+              <button onClick={handleConfirmarSenha} disabled={isPending || novaSenha.length < 6}
+                className="rounded-lg bg-folk px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                Salvar
+              </button>
+              <button onClick={() => { setResetando(false); setNovaSenha(""); }}
+                className="text-xs text-gray-400 hover:text-gray-600">
+                Cancelar
+              </button>
+            </div>
           )}
-          {profile.status !== "recusado" && (
-            <button onClick={() => handleAction("recusado")} disabled={isPending}
-              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50">
-              Recusar
-            </button>
-          )}
-          {profile.status !== "pendente" && (
-            <button onClick={() => handleAction("pendente")} disabled={isPending}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 disabled:opacity-50">
-              Pendente
-            </button>
-          )}
-          <button onClick={handleGerarLink} disabled={isPending}
-            className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50">
-            Link de confirmação
-          </button>
-          <button onClick={() => { setResetando((v) => !v); setErro(null); setSucesso(null); setNovaSenha(""); }} disabled={isPending}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 disabled:opacity-50">
-            Resetar senha
-          </button>
         </div>
 
-        {resetando && (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="password"
-              value={novaSenha}
-              onChange={(e) => setNovaSenha(e.target.value)}
-              placeholder="Nova senha (mín. 6 caracteres)"
-              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-800 outline-none focus:border-folk focus:ring-1 focus:ring-folk/10"
-            />
-            <button onClick={handleConfirmarSenha} disabled={isPending || novaSenha.length < 6}
-              className="rounded-lg bg-folk px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-              Confirmar
-            </button>
-            <button onClick={() => { setResetando(false); setNovaSenha(""); }}
-              className="text-xs text-gray-400 hover:text-gray-600">
-              Cancelar
-            </button>
-          </div>
-        )}
-
-        {linkConfirm && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
-            <p className="min-w-0 flex-1 truncate text-xs text-blue-700">{linkConfirm}</p>
-            <button
-              onClick={() => { navigator.clipboard.writeText(linkConfirm); setSucesso("Link copiado!"); setLinkConfirm(null); }}
-              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-            >
-              Copiar
-            </button>
-          </div>
-        )}
-        {erro    && <p className="mt-1 text-xs text-red-600">{erro}</p>}
-        {sucesso && <p className="mt-1 text-xs text-green-600">{sucesso}</p>}
+        {erro    && <p className="mt-1.5 text-xs text-red-600">{erro}</p>}
+        {sucesso && <p className="mt-1.5 text-xs text-green-600">{sucesso}</p>}
       </td>
     </tr>
   );
