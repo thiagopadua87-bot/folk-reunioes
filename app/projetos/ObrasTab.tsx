@@ -375,11 +375,12 @@ export default function ObrasTab() {
 
       {obras.length > 0 && (
         <div className="flex flex-col gap-3">
-          {obras.map((o) => (
+          {obras.map((o, idx) => (
             <div key={o.id} className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${SITUACAO_BORDA[o.situacao]}`}>
               <div className="flex items-start justify-between gap-4 px-6 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-400">#{idx + 1}</span>
                     <p className="text-sm font-bold text-gray-900">{o.cliente}</p>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${SITUACAO_BADGE[o.situacao]}`}>
                       {labelSituacaoObra(o.situacao)}

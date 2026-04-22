@@ -195,7 +195,7 @@ type RawObra = Omit<Obra, "tecnico_nome" | "terceirizado_nome"> & {
 };
 
 export async function listarObras(filtros?: FiltrosObras): Promise<Obra[]> {
-  let q = supabase.from("obras").select("*, tecnicos(nome), terceirizados(nome_empresa)").order("data_inicio", { ascending: false });
+  let q = supabase.from("obras").select("*, tecnicos(nome), terceirizados(nome_empresa)").order("created_at", { ascending: true });
   if (filtros?.situacao) q = q.eq("situacao", filtros.situacao);
   if (filtros?.equipe)   q = q.eq("equipe", filtros.equipe);
   const { data, error } = await q;
