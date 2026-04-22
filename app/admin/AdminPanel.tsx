@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { atualizarStatusUsuario, reenviarConfirmacao, resetarSenha } from "./actions";
+import { atualizarStatusUsuario, gerarLinkConfirmacao, resetarSenha } from "./actions";
 import type { Profile, UserStatus } from "@/lib/profiles";
 
 const statusLabel: Record<UserStatus, string> = {
@@ -20,8 +20,9 @@ function UserRow({ profile }: { profile: Profile }) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro]           = useState<string | null>(null);
   const [sucesso, setSucesso]     = useState<string | null>(null);
-  const [resetando, setResetando] = useState(false);
-  const [novaSenha, setNovaSenha] = useState("");
+  const [resetando, setResetando]   = useState(false);
+  const [novaSenha, setNovaSenha]   = useState("");
+  const [linkConfirm, setLinkConfirm] = useState<string | null>(null);
 
   function handleAction(status: UserStatus) {
     setErro(null); setSucesso(null);
@@ -34,14 +35,14 @@ function UserRow({ profile }: { profile: Profile }) {
     });
   }
 
-  function handleReenviar() {
-    setErro(null); setSucesso(null);
+  function handleGerarLink() {
+    setErro(null); setSucesso(null); setLinkConfirm(null);
     startTransition(async () => {
       try {
-        await reenviarConfirmacao(profile.email);
-        setSucesso("Email de confirmação reenviado.");
+        const link = await gerarLinkConfirmacao(profile.email);
+        setLinkConfirm(link);
       } catch (e) {
-        setErro(e instanceof Error ? e.message : "Erro ao reenviar.");
+        setErro(e instanceof Error ? e.message : "Erro ao gerar link.");
       }
     });
   }
@@ -92,9 +93,9 @@ function UserRow({ profile }: { profile: Profile }) {
               Pendente
             </button>
           )}
-          <button onClick={handleReenviar} disabled={isPending}
+          <button onClick={handleGerarLink} disabled={isPending}
             className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50">
-            Reenviar confirmação
+            Link de confirmação
           </button>
           <button onClick={() => { setResetando((v) => !v); setErro(null); setSucesso(null); setNovaSenha(""); }} disabled={isPending}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 disabled:opacity-50">
@@ -122,6 +123,17 @@ function UserRow({ profile }: { profile: Profile }) {
           </div>
         )}
 
+        {linkConfirm && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+            <p className="min-w-0 flex-1 truncate text-xs text-blue-700">{linkConfirm}</p>
+            <button
+              onClick={() => { navigator.clipboard.writeText(linkConfirm); setSucesso("Link copiado!"); setLinkConfirm(null); }}
+              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+            >
+              Copiar
+            </button>
+          </div>
+        )}
         {erro    && <p className="mt-1 text-xs text-red-600">{erro}</p>}
         {sucesso && <p className="mt-1 text-xs text-green-600">{sucesso}</p>}
       </td>

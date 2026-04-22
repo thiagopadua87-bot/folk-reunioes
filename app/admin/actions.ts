@@ -33,12 +33,17 @@ export async function atualizarStatusUsuario(userId: string, status: UserStatus)
   revalidatePath("/admin");
 }
 
-export async function reenviarConfirmacao(email: string) {
+export async function gerarLinkConfirmacao(email: string): Promise<string> {
   await assertAdmin();
 
   const admin = createAdminSupabase();
-  const { error } = await admin.auth.resend({ type: "signup", email });
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "signup",
+    email,
+    password: "",
+  });
   if (error) throw new Error(error.message);
+  return data.properties.action_link;
 }
 
 export async function resetarSenha(userId: string, novaSenha: string) {
