@@ -365,7 +365,6 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                 <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fechamento</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Vendedor</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Indicado por</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Serviços</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
@@ -383,7 +382,6 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                     {r.cnpj && <p className="text-xs text-gray-400">{formatarCNPJ(r.cnpj)}</p>}
                   </td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{r.vendedor_nome || "—"}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.indicado_por || "—"}</td>
                   <td className="py-3.5 pr-4">
                     {r.servicos?.length > 0 ? (
                       <div className="flex flex-wrap gap-1">

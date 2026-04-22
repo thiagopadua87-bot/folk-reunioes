@@ -8,7 +8,8 @@ import {
 import { supabase } from "@/lib/supabase";
 
 // ── Configuração ─────────────────────────────────────────────
-const META_MENSAL = 50_000;
+const META_MENSAL   = 50_000;
+const POLL_INTERVAL = 10_000; // 10s
 
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -34,6 +35,13 @@ function getNivel(pct: number): { label: string; cor: string; gradiente: string 
   return             { label: "BRONZE", cor: "#cd7f32", gradiente: "from-amber-700/25 via-amber-800/10 to-transparent" };
 }
 
+function tempoDesde(d: Date): string {
+  const seg = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (seg < 10)  return "agora";
+  if (seg < 60)  return `${seg}s atrás`;
+  return `${Math.floor(seg / 60)}m atrás`;
+}
+
 interface VendedorStats { nome: string; total: number; contratos: number; }
 
 // ── Componente principal ─────────────────────────────────────
@@ -45,19 +53,19 @@ export default function ComercialTVPage() {
   const [novaVendaAtiva,      setNovaVendaAtiva]      = useState(false);
   const [ultimaVendaDestaque, setUltimaVendaDestaque] = useState<Venda | null>(null);
   const [carregando,          setCarregando]          = useState(true);
-  const [agora,               setAgora]               = useState(() => new Date());
+  const [erro,                setErro]                = useState<string | null>(null);
+  const [ultimaAtualizacao,   setUltimaAtualizacao]   = useState<Date | null>(null);
+  const [relogio,             setRelogio]             = useState(() => new Date());
 
   const audioRef       = useRef<HTMLAudioElement | null>(null);
   const somAtivoRef    = useRef(false);
   const prevCountRef   = useRef(-1);
   const novaVendaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync ref instantly (for use inside stable callbacks)
   function ativarSom() {
     setSomAtivo(true);
     somAtivoRef.current = true;
     if (audioRef.current) {
-      // Unlock browser autoplay restriction
       audioRef.current.volume = 0;
       audioRef.current.play()
         .then(() => {
@@ -73,7 +81,7 @@ export default function ComercialTVPage() {
 
   useEffect(() => {
     audioRef.current = new Audio("/sounds/success.mp3");
-    const tick = setInterval(() => setAgora(new Date()), 1_000);
+    const tick = setInterval(() => setRelogio(new Date()), 1_000);
     return () => clearInterval(tick);
   }, []);
 
@@ -111,27 +119,31 @@ export default function ComercialTVPage() {
       prevCountRef.current = portaria.length;
       setVendas(novasVendas);
       setPipeline(novoPipeline);
-    } catch {
-      // TV page — falhas silenciosas
+      setErro(null);
+      setUltimaAtualizacao(new Date());
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      console.error("[TV] Erro ao carregar:", msg);
+      setErro(msg);
     } finally {
-      if (inicial) setCarregando(false);
+      setCarregando(false);
     }
   }, []);
 
-  // Polling a cada 30s
+  // Polling a cada 10s
   useEffect(() => {
     carregar(true);
-    const interval = setInterval(() => carregar(), 30_000);
+    const interval = setInterval(() => carregar(), POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [carregar]);
 
-  // Realtime Supabase — recarrega ao inserir nova venda
+  // Realtime — recarrega imediatamente ao inserir nova venda
   useEffect(() => {
     const channel = supabase
       .channel("tv-vendas-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "vendas" }, () => {
-        // Aguarda 1.2s para garantir que venda_servicos também foi inserido
-        setTimeout(() => carregar(), 1_200);
+        // Aguarda 1.5s para garantir que venda_servicos foi inserido
+        setTimeout(() => carregar(), 1_500);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -157,12 +169,12 @@ export default function ComercialTVPage() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  const pipelineAtivos     = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
-  const pipelineNegociacao = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
+  const pipelineAtivos      = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
+  const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
   const pipelineConvertidos = pipeline.filter((p) => p.status === "fechado_ganho").length;
 
-  const mesLabel  = `${MESES_PT[agora.getMonth()]} ${agora.getFullYear()}`;
-  const horaLabel = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const mesLabel  = `${MESES_PT[relogio.getMonth()]} ${relogio.getFullYear()}`;
+  const horaLabel = relogio.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   // ── Loading ────────────────────────────────────────────────
 
@@ -184,29 +196,23 @@ export default function ComercialTVPage() {
       <style>{`
         @keyframes nova-venda-glow {
           0%   { box-shadow: 0 0  0px  0px rgba(255,215,0,0.0); }
-          20%  { box-shadow: 0 0 40px 10px rgba(255,215,0,0.6), 0 0 80px 20px rgba(255,215,0,0.3); }
-          80%  { box-shadow: 0 0 40px 10px rgba(255,215,0,0.6), 0 0 80px 20px rgba(255,215,0,0.3); }
+          20%  { box-shadow: 0 0 40px 10px rgba(255,215,0,0.7), 0 0 80px 20px rgba(255,215,0,0.3); }
+          80%  { box-shadow: 0 0 40px 10px rgba(255,215,0,0.7), 0 0 80px 20px rgba(255,215,0,0.3); }
           100% { box-shadow: 0 0  0px  0px rgba(255,215,0,0.0); }
         }
         .nova-venda-glow { animation: nova-venda-glow 3s ease-in-out; }
 
-        @keyframes progress-fill {
-          from { width: 0%; }
-          to   { width: var(--progress-w); }
-        }
-        .progress-bar { animation: progress-fill 1.8s cubic-bezier(.22,1,.36,1) forwards; }
-
         @keyframes fade-up {
-          from { opacity: 0; transform: translateY(12px); }
+          from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .fade-up { animation: fade-up 0.7s ease-out both; }
+        .fade-up { animation: fade-up 0.5s ease-out both; }
 
         @keyframes nova-badge-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50%       { opacity: 0.7; transform: scale(1.05); }
+          50%       { opacity: 0.7; transform: scale(1.06); }
         }
-        .nova-badge { animation: nova-badge-pulse 0.8s ease-in-out infinite; }
+        .nova-badge { animation: nova-badge-pulse 0.7s ease-in-out infinite; }
 
         @keyframes shimmer {
           0%   { background-position: -200% center; }
@@ -232,11 +238,28 @@ export default function ComercialTVPage() {
             <span className="ml-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-2.5 py-0.5 text-xs font-semibold text-orange-400">
               Portaria Remota
             </span>
+            {/* Status de atualização */}
+            {erro ? (
+              <span className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-0.5 text-xs font-semibold text-red-400">
+                ⚠ Erro ao carregar — tentando novamente...
+              </span>
+            ) : ultimaAtualizacao ? (
+              <span className="text-xs text-gray-600">
+                Atualizado {tempoDesde(ultimaAtualizacao)}
+              </span>
+            ) : null}
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4">
             <span className="text-sm font-semibold text-gray-300">{mesLabel}</span>
             <span className="font-mono text-sm text-gray-500">{horaLabel}</span>
+            <button
+              onClick={() => carregar()}
+              className="rounded-full border border-gray-700 bg-gray-800/60 px-3 py-1.5 text-xs font-semibold text-gray-400 transition-all hover:border-gray-500 hover:text-gray-200"
+              title="Forçar atualização"
+            >
+              ↺ Atualizar
+            </button>
             {somAtivo ? (
               <span className="flex items-center gap-2 rounded-full border border-green-500/40 bg-green-500/10 px-4 py-1.5 text-sm font-semibold text-green-400">
                 🔊 Som ativo
@@ -257,7 +280,6 @@ export default function ComercialTVPage() {
 
           {/* META — col 1-2, row 1 */}
           <div className={`relative col-span-2 overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 bg-gradient-to-br ${nivel.gradiente} p-8 flex flex-col justify-between`}>
-            {/* Decoração de fundo */}
             <div
               className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-10 blur-3xl"
               style={{ background: nivel.cor }}
@@ -289,9 +311,8 @@ export default function ComercialTVPage() {
               </div>
             </div>
 
-            {/* Barra de progresso */}
+            {/* Barra de progresso — usa transition para atualizar suavemente */}
             <div>
-              {/* Marcadores de nível */}
               <div className="relative mb-1 flex justify-between text-[10px] text-gray-700">
                 <span>0%</span>
                 <span className="absolute left-[33%] -translate-x-1/2">Bronze 33%</span>
@@ -299,17 +320,15 @@ export default function ComercialTVPage() {
                 <span>Meta 100%</span>
               </div>
               <div className="relative h-7 w-full overflow-hidden rounded-full bg-gray-800">
-                {/* Marcadores de nível internos */}
                 <div className="absolute left-[33%] top-0 h-full w-px bg-gray-700/60" />
                 <div className="absolute left-[66%] top-0 h-full w-px bg-gray-700/60" />
-                {/* Barra preenchida */}
                 <div
-                  className="progress-bar h-full rounded-full"
+                  className="h-full rounded-full transition-all duration-1000 ease-out"
                   style={{
-                    "--progress-w": `${pct * 100}%`,
+                    width: `${pct * 100}%`,
                     background: `linear-gradient(90deg, ${nivel.cor}99 0%, ${nivel.cor} 100%)`,
                     boxShadow: `0 0 24px ${nivel.cor}80, 0 0 48px ${nivel.cor}40`,
-                  } as React.CSSProperties}
+                  }}
                 />
               </div>
             </div>
@@ -356,7 +375,8 @@ export default function ComercialTVPage() {
 
           {/* ÚLTIMA VENDA — col 1, row 2 */}
           <div
-            className={`relative overflow-hidden rounded-3xl border bg-gray-900 p-6 flex flex-col justify-between transition-all duration-500 ${
+            key={novaVendaAtiva ? "glow" : "normal"}
+            className={`relative overflow-hidden rounded-3xl border bg-gray-900 p-6 flex flex-col justify-between transition-colors duration-500 ${
               novaVendaAtiva ? "border-yellow-400 nova-venda-glow" : "border-gray-800"
             }`}
           >
@@ -379,7 +399,7 @@ export default function ComercialTVPage() {
                   {ultimaVendaDestaque.cliente}
                 </p>
                 <p
-                  className="mt-3 text-5xl font-black leading-none"
+                  className="mt-3 text-5xl font-black leading-none transition-colors duration-500"
                   style={{
                     color:      novaVendaAtiva ? "#ffd700" : "#10b981",
                     textShadow: novaVendaAtiva ? "0 0 30px #ffd70080" : "0 0 20px #10b98180",
@@ -403,21 +423,18 @@ export default function ComercialTVPage() {
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Pipeline</p>
 
             <div className="grid grid-cols-3 items-center gap-4">
-              {/* Propostas ativas */}
               <div className="flex flex-col items-center rounded-2xl border border-gray-800 bg-gray-800/50 py-6">
                 <p className="text-6xl font-black text-white">{pipelineAtivos.length}</p>
                 <p className="mt-2 text-sm font-medium text-gray-400">Ativas</p>
                 <p className="text-xs text-gray-600">propostas</p>
               </div>
 
-              {/* Em negociação */}
               <div className="flex flex-col items-center rounded-2xl border border-orange-500/20 bg-orange-500/5 py-6">
                 <p className="text-6xl font-black" style={{ color: "#F05A28" }}>{pipelineNegociacao.length}</p>
                 <p className="mt-2 text-sm font-medium text-orange-400/80">Em negociação</p>
                 <p className="text-xs text-gray-600">análise + assinatura</p>
               </div>
 
-              {/* Convertidas */}
               <div className="flex flex-col items-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5 py-6">
                 <p className="text-6xl font-black text-emerald-400">{pipelineConvertidos}</p>
                 <p className="mt-2 text-sm font-medium text-emerald-400/80">Convertidas</p>
