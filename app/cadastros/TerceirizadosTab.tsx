@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   listarTerceirizados, criarTerceirizado, editarTerceirizado,
-  listarTecnicos, validarCPF, formatarCPF, formatarCNPJ,
-  type Terceirizado, type TerceirizadoPayload, type FiltrosTerceirizados, type Tecnico,
+  validarCPF, formatarCPF, formatarCNPJ,
+  type Terceirizado, type TerceirizadoPayload, type FiltrosTerceirizados,
 } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 
@@ -19,18 +19,16 @@ interface FormState {
   email: string;
   nome_responsavel: string;
   cpf_responsavel: string;
-  tecnico_responsavel_id: string;
   ativo: boolean;
 }
 
 const FORM_VAZIO: FormState = {
   cnpj: "", nome_empresa: "", contato: "", telefone: "", email: "",
-  nome_responsavel: "", cpf_responsavel: "", tecnico_responsavel_id: "", ativo: true,
+  nome_responsavel: "", cpf_responsavel: "", ativo: true,
 };
 
 export default function TerceirizadosTab() {
   const [registros, setRegistros] = useState<Terceirizado[]>([]);
-  const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "form">("list");
@@ -44,12 +42,8 @@ export default function TerceirizadosTab() {
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
     try {
-      const [lista, tecList] = await Promise.all([
-        listarTerceirizados({ busca: filtros.busca || undefined, ativo: filtros.ativo ?? undefined }),
-        listarTecnicos({ ativo: true }),
-      ]);
+      const lista = await listarTerceirizados({ busca: filtros.busca || undefined, ativo: filtros.ativo ?? undefined });
       setRegistros(lista);
-      setTecnicos(tecList);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally { setCarregando(false); }
@@ -63,8 +57,7 @@ export default function TerceirizadosTab() {
     setForm({
       cnpj: r.cnpj, nome_empresa: r.nome_empresa, contato: r.contato,
       telefone: r.telefone, email: r.email, nome_responsavel: r.nome_responsavel,
-      cpf_responsavel: r.cpf_responsavel, tecnico_responsavel_id: r.tecnico_responsavel_id ?? "",
-      ativo: r.ativo,
+      cpf_responsavel: r.cpf_responsavel, ativo: r.ativo,
     });
     setErroForm(null); setView("form");
   }
@@ -93,15 +86,14 @@ export default function TerceirizadosTab() {
     setSalvando(true); setErroForm(null);
     try {
       const payload: TerceirizadoPayload = {
-        cnpj:                   form.cnpj.trim(),
-        nome_empresa:           form.nome_empresa.trim(),
-        contato:                form.contato.trim(),
-        telefone:               form.telefone.trim(),
-        email:                  form.email.trim(),
-        nome_responsavel:       form.nome_responsavel.trim(),
-        cpf_responsavel:        form.cpf_responsavel.trim(),
-        tecnico_responsavel_id: form.tecnico_responsavel_id || null,
-        ativo:                  form.ativo,
+        cnpj:             form.cnpj.trim(),
+        nome_empresa:     form.nome_empresa.trim(),
+        contato:          form.contato.trim(),
+        telefone:         form.telefone.trim(),
+        email:            form.email.trim(),
+        nome_responsavel: form.nome_responsavel.trim(),
+        cpf_responsavel:  form.cpf_responsavel.trim(),
+        ativo:            form.ativo,
       };
       if (editando) await editarTerceirizado(editando.id, payload);
       else           await criarTerceirizado(payload);
@@ -116,8 +108,7 @@ export default function TerceirizadosTab() {
       await editarTerceirizado(r.id, {
         cnpj: r.cnpj, nome_empresa: r.nome_empresa, contato: r.contato,
         telefone: r.telefone, email: r.email, nome_responsavel: r.nome_responsavel,
-        cpf_responsavel: r.cpf_responsavel, tecnico_responsavel_id: r.tecnico_responsavel_id,
-        ativo: !r.ativo,
+        cpf_responsavel: r.cpf_responsavel, ativo: !r.ativo,
       });
       await carregar();
     } catch (e) {
@@ -200,17 +191,8 @@ export default function TerceirizadosTab() {
               </div>
             </div>
 
-            {/* Técnico responsável + Ativo */}
-            <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Técnico responsável</label>
-              <select value={form.tecnico_responsavel_id} onChange={(e) => set("tecnico_responsavel_id", e.target.value)} className={INPUT}>
-                <option value="">Nenhum</option>
-                {tecnicos.map((t) => (
-                  <option key={t.id} value={t.id}>{t.nome}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-3 self-end pb-2">
+            {/* Ativo */}
+            <div className="flex items-center gap-3 sm:col-span-2">
               <input type="checkbox" id="ativo-ter" checked={form.ativo} onChange={(e) => set("ativo", e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-folk" />
               <label htmlFor="ativo-ter" className="text-sm text-gray-700">Ativo</label>
             </div>
@@ -268,7 +250,6 @@ export default function TerceirizadosTab() {
                 <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Empresa</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">CNPJ</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Contato</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Técnico responsável</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="py-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
@@ -279,7 +260,6 @@ export default function TerceirizadosTab() {
                   <td className="py-3.5 pl-6 pr-4 text-sm font-medium text-gray-900">{r.nome_empresa}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{r.cnpj || "—"}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{r.contato || "—"}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.tecnico_nome || "—"}</td>
                   <td className="py-3.5 pr-4">
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${r.ativo ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
                       {r.ativo ? "Ativo" : "Inativo"}

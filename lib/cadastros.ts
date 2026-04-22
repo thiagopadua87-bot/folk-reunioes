@@ -32,8 +32,6 @@ export interface Terceirizado {
   email: string;
   nome_responsavel: string;
   cpf_responsavel: string;
-  tecnico_responsavel_id: string | null;
-  tecnico_nome: string | null;
   ativo: boolean;
   created_at: string;
 }
@@ -122,23 +120,16 @@ export async function editarTecnico(id: string, payload: TecnicoPayload): Promis
 
 // ── Terceirizados ─────────────────────────────────────────────
 
-export type TerceirizadoPayload = Omit<Terceirizado, "id" | "user_id" | "created_at" | "tecnico_nome">;
+export type TerceirizadoPayload = Omit<Terceirizado, "id" | "user_id" | "created_at">;
 
 export interface FiltrosTerceirizados { busca?: string; ativo?: boolean | null }
 
-type RawTerceirizado = Omit<Terceirizado, "tecnico_nome"> & {
-  tecnicos: { nome: string } | null;
-};
-
 export async function listarTerceirizados(filtros?: FiltrosTerceirizados): Promise<Terceirizado[]> {
-  let q = supabase.from("terceirizados").select("*, tecnicos(nome)").order("nome_empresa");
+  let q = supabase.from("terceirizados").select("*").order("nome_empresa");
   if (filtros?.ativo != null) q = q.eq("ativo", filtros.ativo);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  const lista = ((data ?? []) as RawTerceirizado[]).map(({ tecnicos, ...t }) => ({
-    ...t,
-    tecnico_nome: tecnicos?.nome ?? null,
-  }));
+  const lista = (data ?? []) as Terceirizado[];
   if (filtros?.busca) {
     const b = filtros.busca.toLowerCase();
     return lista.filter((t) => t.nome_empresa.toLowerCase().includes(b) || t.contato.toLowerCase().includes(b));
