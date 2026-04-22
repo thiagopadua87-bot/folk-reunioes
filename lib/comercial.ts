@@ -15,11 +15,12 @@ export const TEMPERATURAS = [
 ] as const;
 
 export const STATUS_PIPELINE = [
-  { value: "apresentacao", label: "Apresentação da empresa ou proposta" },
-  { value: "em_analise",   label: "Em análise" },
-  { value: "assinatura",   label: "Assinatura de Contrato" },
-  { value: "fechado",      label: "Fechado" },
-  { value: "declinado",    label: "Declinado" },
+  { value: "apresentacao",  label: "Apresentação da empresa ou proposta" },
+  { value: "em_analise",    label: "Em análise" },
+  { value: "assinatura",    label: "Assinatura de Contrato" },
+  { value: "fechado",       label: "Fechado" },
+  { value: "declinado",     label: "Declinado" },
+  { value: "fechado_ganho", label: "Fechado (ganho)" },
 ] as const;
 
 export const SERVICOS_COMERCIAL = [
@@ -175,11 +176,36 @@ export async function criarVenda(payload: VendaPayload, servicos: string[], arqu
 }
 
 export async function marcarPipelineConvertido(pipelineId: string, vendaId: string): Promise<void> {
+  const { data: item } = await supabase
+    .from("pipeline")
+    .select("status")
+    .eq("id", pipelineId)
+    .single();
+
+  const statusAnteriorLabel = item?.status
+    ? (labelStatusPipeline(item.status as StatusPipeline) ?? item.status)
+    : "—";
+
   const { error } = await supabase
     .from("pipeline")
-    .update({ convertido_em_venda: true, venda_id: vendaId })
+    .update({ convertido_em_venda: true, venda_id: vendaId, status: "fechado_ganho" })
     .eq("id", pipelineId);
   if (error) throw new Error(error.message);
+
+  await supabase.from("pipeline_logs").insert([
+    {
+      proposta_id:    pipelineId,
+      campo:          "status",
+      valor_anterior: statusAnteriorLabel,
+      valor_novo:     "Fechado (ganho)",
+    },
+    {
+      proposta_id:    pipelineId,
+      campo:          "conversao",
+      valor_anterior: "pipeline",
+      valor_novo:     "convertido_em_venda",
+    },
+  ]);
 }
 
 export async function editarVenda(id: string, payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
@@ -342,6 +368,15 @@ async function registrarAlteracoes(
   }
   for (const s of antigosServicos.filter((s) => !novosServicos.includes(s))) {
     logs.push({ proposta_id: propostaId, campo: "servico_removido", valor_anterior: s, valor_novo: "" });
+  }
+
+  if (antigo.convertido_em_venda && logs.length > 0) {
+    logs.push({
+      proposta_id:    propostaId,
+      campo:          "edicao_pos_conversao",
+      valor_anterior: "original",
+      valor_novo:     "alterado",
+    });
   }
 
   if (logs.length === 0) return;

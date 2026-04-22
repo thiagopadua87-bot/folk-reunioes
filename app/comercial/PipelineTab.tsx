@@ -27,33 +27,38 @@ const TEMP_BORDA: Record<Temperatura, string> = {
 };
 
 const STATUS_BADGE: Record<StatusPipeline, string> = {
-  apresentacao: "bg-gray-100 text-gray-600 border-gray-200",
-  em_analise:   "bg-yellow-100 text-yellow-700 border-yellow-200",
-  assinatura:   "bg-folk/10 text-folk border-folk/20",
-  fechado:      "bg-green-100 text-green-700 border-green-200",
-  declinado:    "bg-red-100 text-red-500 border-red-200",
+  apresentacao:  "bg-gray-100 text-gray-600 border-gray-200",
+  em_analise:    "bg-yellow-100 text-yellow-700 border-yellow-200",
+  assinatura:    "bg-folk/10 text-folk border-folk/20",
+  fechado:       "bg-green-100 text-green-700 border-green-200",
+  declinado:     "bg-red-100 text-red-500 border-red-200",
+  fechado_ganho: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
 // ── Log helpers ──────────────────────────────────────────────
 
 const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  status:             { label: "Status",             dot: "bg-folk" },
-  temperatura:        { label: "Temperatura",        dot: "bg-amber-400" },
-  vendedor:           { label: "Vendedor",            dot: "bg-blue-400" },
-  valor:              { label: "Valor",               dot: "bg-green-500" },
-  servico_adicionado: { label: "Serviço adicionado",  dot: "bg-folk" },
-  servico_removido:   { label: "Serviço removido",    dot: "bg-red-400" },
+  status:               { label: "Status",                    dot: "bg-folk" },
+  temperatura:          { label: "Temperatura",               dot: "bg-amber-400" },
+  vendedor:             { label: "Vendedor",                  dot: "bg-blue-400" },
+  valor:                { label: "Valor",                     dot: "bg-green-500" },
+  servico_adicionado:   { label: "Serviço adicionado",        dot: "bg-folk" },
+  servico_removido:     { label: "Serviço removido",          dot: "bg-red-400" },
+  conversao:            { label: "Proposta convertida em venda", dot: "bg-emerald-500" },
+  edicao_pos_conversao: { label: "Editado após conversão",    dot: "bg-amber-400" },
 };
 
 function formatLogMsg(log: PipelineLog): string {
   switch (log.campo) {
-    case "status":             return `"${log.valor_anterior}" → "${log.valor_novo}"`;
-    case "temperatura":        return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "vendedor":           return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "valor":              return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "servico_adicionado": return log.valor_novo;
-    case "servico_removido":   return log.valor_anterior;
-    default:                   return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "status":               return `"${log.valor_anterior}" → "${log.valor_novo}"`;
+    case "temperatura":          return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "vendedor":             return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "valor":                return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "servico_adicionado":   return log.valor_novo;
+    case "servico_removido":     return log.valor_anterior;
+    case "conversao":            return "Proposta convertida em venda";
+    case "edicao_pos_conversao": return "⚠ Proposta editada após conversão";
+    default:                     return `${log.valor_anterior} → ${log.valor_novo}`;
   }
 }
 
@@ -223,6 +228,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           <h2 className="text-lg font-bold text-gray-900">{editando ? `Editando — ${editando.cliente}` : "Nova proposta"}</h2>
         </div>
 
+        {editando?.convertido_em_venda && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <span className="mt-0.5 text-amber-500">⚠</span>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Esta proposta já foi convertida em venda.</p>
+              <p className="text-xs text-amber-600">Alterações aqui podem gerar inconsistência com a venda criada. As edições serão registradas no histórico.</p>
+            </div>
+          </div>
+        )}
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -293,6 +307,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               <div>
                 {logs.map((log, i) => {
                   const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
+                  const isConversao = log.campo === "conversao";
+                  const isPosConversao = log.campo === "edicao_pos_conversao";
                   return (
                     <div key={log.id} className="flex gap-3">
                       <div className="flex flex-col items-center">
@@ -301,8 +317,16 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                       </div>
                       <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
                         <p className="text-[11px] text-gray-400 mb-0.5">{formatLogTs(log.created_at)}</p>
-                        <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
-                        <p className="text-sm text-gray-700">{formatLogMsg(log)}</p>
+                        {isConversao ? (
+                          <p className="text-sm font-semibold text-emerald-700">✓ Proposta convertida em venda</p>
+                        ) : isPosConversao ? (
+                          <p className="text-sm font-semibold text-amber-600">⚠ Proposta editada após conversão</p>
+                        ) : (
+                          <>
+                            <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
+                            <p className="text-sm text-gray-700">{formatLogMsg(log)}</p>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
