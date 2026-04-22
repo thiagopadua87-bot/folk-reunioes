@@ -91,15 +91,15 @@ export default function ComercialTVPage() {
         listarPipeline(),
       ]);
 
-      const portaria = novasVendas.filter((v) => v.servicos?.includes("Portaria Remota"));
-      const maisRecente = [...portaria].sort(
+      const portaria    = novasVendas.filter((v) => v.servicos?.includes("Portaria Remota"));
+      const maisRecente = [...novasVendas].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0] ?? null;
 
       const isNova =
         !inicial &&
         prevCountRef.current >= 0 &&
-        portaria.length > prevCountRef.current &&
+        novasVendas.length > prevCountRef.current &&
         !!maisRecente;
 
       if (isNova && maisRecente) {
@@ -115,7 +115,7 @@ export default function ComercialTVPage() {
         setUltimaVendaDestaque(maisRecente);
       }
 
-      prevCountRef.current = portaria.length;
+      prevCountRef.current = novasVendas.length;
       setVendas(novasVendas);
       setPipeline(novoPipeline);
       setErro(null);
@@ -151,14 +151,20 @@ export default function ComercialTVPage() {
 
   // ── Computed ───────────────────────────────────────────────
 
+  // Meta anual: apenas Portaria Remota
   const portaria       = vendas.filter((v) => v.servicos?.includes("Portaria Remota"));
   const totalReceita   = portaria.reduce((s, v) => s + v.valor, 0);
   const totalContratos = portaria.length;
   const pct            = Math.min(totalReceita / META_MENSAL, 1);
   const nivel          = getNivel(pct);
 
+  // Última venda e ranking: todos os serviços
+  const ultimaVendaGeral = [...vendas].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )[0] ?? null;
+
   const ranking: VendedorStats[] = Object.values(
-    portaria.reduce((acc, v) => {
+    vendas.reduce((acc, v) => {
       const nome = v.vendedor_nome ?? "Sem vendedor";
       if (!acc[nome]) acc[nome] = { nome, total: 0, contratos: 0 };
       acc[nome].total    += v.valor;
@@ -168,6 +174,8 @@ export default function ComercialTVPage() {
   )
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
+
+  const totalReceitaGeral = vendas.reduce((s, v) => s + v.valor, 0);
 
   const pipelineAtivos      = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
   const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
@@ -230,7 +238,7 @@ export default function ComercialTVPage() {
       <div className="relative flex h-screen flex-col overflow-hidden bg-gray-950 text-white" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
 
         {/* DIAGNÓSTICO — aparece quando não há vendas portaria após primeira carga */}
-        {totalContratos === 0 && ultimaAtualizacao && (
+        {vendas.length === 0 && ultimaAtualizacao && (
           <div className="absolute bottom-5 left-5 z-50 rounded-2xl border border-yellow-500/40 bg-gray-950/95 p-4 font-mono text-xs text-yellow-300 shadow-xl">
             <p className="mb-2 font-bold text-yellow-400">⚠ Diagnóstico — sem dados</p>
             <p>Usuário: <span className="text-white">{debug.userEmail}</span></p>
@@ -348,7 +356,7 @@ export default function ComercialTVPage() {
 
           {/* RANKING — col 3, row 1 */}
           <div className="rounded-3xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
-            <p className="shrink-0 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Ranking do mês</p>
+            <p className="shrink-0 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Ranking — todos os serviços</p>
 
             {ranking.length === 0 ? (
               <p className="text-sm text-gray-600">Nenhuma venda registrada.</p>
@@ -357,7 +365,7 @@ export default function ComercialTVPage() {
                 {ranking.map((v, i) => {
                   const MEDALHAS = ["🥇", "🥈", "🥉"];
                   const CORES    = ["#ffd700", "#c0c0c0", "#cd7f32", "#94a3b8", "#94a3b8"];
-                  const pctBar   = totalReceita > 0 ? v.total / totalReceita : 0;
+                  const pctBar   = totalReceitaGeral > 0 ? v.total / totalReceitaGeral : 0;
                   return (
                     <div key={v.nome} className="flex items-center gap-3">
                       <span className="w-8 shrink-0 text-center text-xl">
