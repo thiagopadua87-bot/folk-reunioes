@@ -25,19 +25,29 @@ export interface Tecnico {
 export interface Terceirizado {
   id: string;
   user_id: string;
+  cnpj: string;
   nome_empresa: string;
   contato: string;
   telefone: string;
   email: string;
-  cpf: string;
+  nome_responsavel: string;
+  cpf_responsavel: string;
   tecnico_responsavel_id: string | null;
   tecnico_nome: string | null;
-  tipo_servico: string;
   ativo: boolean;
   created_at: string;
 }
 
-// ── CPF ──────────────────────────────────────────────────────
+// ── CNPJ / CPF ───────────────────────────────────────────────
+
+export function formatarCNPJ(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
 
 export function validarCPF(cpf: string): boolean {
   const digits = cpf.replace(/\D/g, "");
