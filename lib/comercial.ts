@@ -49,6 +49,7 @@ export interface Venda {
   tipo_venda: TipoVenda;
   arquivo_url: string | null;
   arquivo_nome: string | null;
+  enviado_para_projetos: boolean;
   created_at: string;
 }
 
@@ -94,7 +95,7 @@ export function formatData(s: string) {
 
 // ── Vendas ───────────────────────────────────────────────────
 
-export type VendaPayload = Omit<Venda, "id" | "user_id" | "created_at" | "servicos" | "vendedor_nome">;
+export type VendaPayload = Omit<Venda, "id" | "user_id" | "created_at" | "servicos" | "vendedor_nome" | "arquivo_url" | "arquivo_nome" | "enviado_para_projetos">;
 
 export interface FiltrosVendas {
   dataInicio?: string;
@@ -181,6 +182,43 @@ export async function editarVenda(id: string, payload: VendaPayload, servicos: s
 export async function excluirVenda(id: string): Promise<void> {
   const { error } = await supabase.from("vendas").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+export async function criarObraAPartirDaVenda(venda: Venda): Promise<string> {
+  if (venda.enviado_para_projetos) throw new Error("Esta venda já foi enviada para projetos.");
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  const { data: obra, error: errObra } = await supabase
+    .from("obras")
+    .insert({
+      data_inicio:     hoje,
+      data_prazo:      null,
+      data_conclusao:  null,
+      cliente:         venda.cliente,
+      servicos:        venda.servicos ?? [],
+      situacao:        "a_executar",
+      equipe:          "equipe_propria",
+      tecnico_id:      null,
+      terceirizado_id: null,
+      valor_execucao:  0,
+      andamento:       0,
+      observacoes:     venda.observacoes ?? "",
+      venda_id:        venda.id,
+    })
+    .select("id")
+    .single();
+
+  if (errObra || !obra) throw new Error(errObra?.message ?? "Erro ao criar obra.");
+
+  const { error: errVenda } = await supabase
+    .from("vendas")
+    .update({ enviado_para_projetos: true })
+    .eq("id", venda.id);
+
+  if (errVenda) throw new Error(errVenda.message);
+
+  return obra.id;
 }
 
 // ── Pipeline ─────────────────────────────────────────────────

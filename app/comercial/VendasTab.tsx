@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  listarVendas, criarVenda, editarVenda, excluirVenda,
+  listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda,
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
   type Venda, type VendaPayload, type TipoVenda, type FiltrosVendas,
 } from "@/lib/comercial";
@@ -80,6 +80,7 @@ export default function VendasTab() {
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [enviando, setEnviando]   = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "" });
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [erroCNPJ, setErroCNPJ]         = useState<string | null>(null);
@@ -155,6 +156,18 @@ export default function VendasTab() {
     try { await excluirVenda(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
     finally { setExcluindo(null); }
+  }
+
+  async function handleEnviarParaProjetos(venda: Venda) {
+    setEnviando(venda.id);
+    try {
+      await criarObraAPartirDaVenda(venda);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao enviar para projetos.");
+    } finally {
+      setEnviando(null);
+    }
   }
 
   const total = registros.reduce((acc, r) => acc + r.valor, 0);
@@ -317,6 +330,7 @@ export default function VendasTab() {
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Anexo</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Projetos</th>
                 <th className="py-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
             </thead>
@@ -354,6 +368,21 @@ export default function VendasTab() {
                         Baixar
                       </a>
                     ) : <span className="text-sm text-gray-400">—</span>}
+                  </td>
+                  <td className="py-3.5 pr-4">
+                    {r.enviado_para_projetos ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                        ✓ Enviado
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleEnviarParaProjetos(r)}
+                        disabled={enviando === r.id}
+                        className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
+                      >
+                        {enviando === r.id ? "Enviando..." : "→ Projetos"}
+                      </button>
+                    )}
                   </td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">

@@ -62,6 +62,7 @@ export interface Obra {
   valor_execucao: number;
   andamento: Andamento;
   observacoes: string;
+  venda_id: string | null;
   created_at: string;
 }
 
