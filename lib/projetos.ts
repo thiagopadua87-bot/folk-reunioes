@@ -61,6 +61,7 @@ export interface Obra {
   terceirizado_nome: string | null;
   valor_execucao: number;
   andamento: Andamento;
+  observacoes: string;
   created_at: string;
 }
 

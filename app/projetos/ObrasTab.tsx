@@ -92,12 +92,14 @@ interface FormState {
   terceirizado_id: string;
   valor_execucao: string;
   andamento: string;
+  observacoes: string;
 }
 
 const FORM_VAZIO: FormState = {
   data_inicio: "", data_prazo: "", cliente: "", servicos: [],
   situacao: "a_executar", equipe: "equipe_propria",
   tecnico_id: "", terceirizado_id: "", valor_execucao: "", andamento: "0",
+  observacoes: "",
 };
 
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
@@ -155,6 +157,7 @@ export default function ObrasTab() {
       terceirizado_id: o.terceirizado_id ?? "",
       valor_execucao:  o.valor_execucao ? String(o.valor_execucao) : "",
       andamento:       String(o.andamento),
+      observacoes:     o.observacoes ?? "",
     });
     setErroForm(null); setView("form"); carregarLogs(o.id);
   }
@@ -180,6 +183,7 @@ export default function ObrasTab() {
         terceirizado_id: form.equipe === "terceiro" ? (form.terceirizado_id || null) : null,
         valor_execucao:  form.equipe === "terceiro" ? (parseFloat(form.valor_execucao.replace(",", ".")) || 0) : 0,
         andamento,
+        observacoes:     form.observacoes.trim(),
       };
       const idEditado = editando?.id ?? null;
       if (editando) await editarObra(editando.id, payload, editando, tecnicos, terceirizados);
@@ -282,6 +286,16 @@ export default function ObrasTab() {
               >
                 {ANDAMENTOS.map((a) => <option key={a} value={a}>{a}%</option>)}
               </select>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className={LABEL}>Observações</label>
+              <textarea
+                value={form.observacoes}
+                onChange={(e) => set("observacoes", e.target.value)}
+                placeholder="Informações adicionais sobre a obra..."
+                rows={3}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full resize-none"
+              />
             </div>
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
             <div className="flex gap-3 sm:col-span-2">
@@ -400,6 +414,9 @@ export default function ObrasTab() {
                     <div className="mt-2 flex flex-wrap gap-1">
                       {o.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}
                     </div>
+                  )}
+                  {o.observacoes && (
+                    <p className="mt-2 text-xs text-gray-400 italic">{o.observacoes}</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
