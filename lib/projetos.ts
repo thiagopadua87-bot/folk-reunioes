@@ -49,6 +49,7 @@ export interface Obra {
   id: string;
   user_id: string;
   data_inicio: string;
+  data_inicio_previsto: string | null;
   data_prazo: string | null;
   data_conclusao: string | null;
   cliente: string;

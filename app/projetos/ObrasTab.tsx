@@ -30,7 +30,8 @@ const SITUACAO_BORDA: Record<SituacaoObra, string> = {
 };
 
 const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  data_inicio:    { label: "Data de início",        dot: "bg-blue-400" },
+  data_inicio:          { label: "Data de registro",       dot: "bg-blue-400" },
+  data_inicio_previsto: { label: "Início previsto",        dot: "bg-indigo-400" },
   data_prazo:     { label: "Prazo estimado",         dot: "bg-amber-400" },
   situacao:       { label: "Situação",               dot: "bg-folk" },
   equipe:         { label: "Equipe",                 dot: "bg-purple-400" },
@@ -83,6 +84,7 @@ function BarraAndamento({ valor }: { valor: number }) {
 
 interface FormState {
   data_inicio: string;
+  data_inicio_previsto: string;
   data_prazo: string;
   cliente: string;
   servicos: string[];
@@ -96,7 +98,7 @@ interface FormState {
 }
 
 const FORM_VAZIO: FormState = {
-  data_inicio: "", data_prazo: "", cliente: "", servicos: [],
+  data_inicio: "", data_inicio_previsto: "", data_prazo: "", cliente: "", servicos: [],
   situacao: "a_executar", equipe: "equipe_propria",
   tecnico_id: "", terceirizado_id: "", valor_execucao: "", andamento: "0",
   observacoes: "",
@@ -147,8 +149,9 @@ export default function ObrasTab() {
   function abrirEditar(o: Obra) {
     setEditando(o);
     setForm({
-      data_inicio:     o.data_inicio,
-      data_prazo:      o.data_prazo ?? "",
+      data_inicio:          o.data_inicio,
+      data_inicio_previsto: o.data_inicio_previsto ?? "",
+      data_prazo:           o.data_prazo ?? "",
       cliente:         o.cliente,
       servicos:        o.servicos ?? [],
       situacao:        o.situacao,
@@ -172,8 +175,9 @@ export default function ObrasTab() {
       const andamento = parseInt(form.andamento) as Andamento;
       const finalizada = andamento === 100;
       const payload: ObraPayload = {
-        data_inicio:     form.data_inicio,
-        data_prazo:      form.data_prazo || null,
+        data_inicio:          form.data_inicio,
+        data_inicio_previsto: form.data_inicio_previsto || null,
+        data_prazo:           form.data_prazo || null,
         data_conclusao:  finalizada ? new Date().toISOString().slice(0, 10) : (editando?.data_conclusao ?? null),
         cliente:         form.cliente.trim(),
         servicos:        form.servicos,
@@ -221,8 +225,12 @@ export default function ObrasTab() {
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Data de início *</label>
+              <label className={LABEL}>Data de registro *</label>
               <input type="date" value={form.data_inicio} onChange={(e) => set("data_inicio", e.target.value)} required className={INPUT} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Início previsto da obra</label>
+              <input type="date" value={form.data_inicio_previsto} onChange={(e) => set("data_inicio_previsto", e.target.value)} className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Prazo estimado de conclusão</label>
@@ -390,7 +398,8 @@ export default function ObrasTab() {
                     <span>{labelEquipe(o.equipe)}{o.equipe === "equipe_propria" && o.tecnico_nome ? ` — ${o.tecnico_nome}` : o.equipe === "terceiro" && o.terceirizado_nome ? ` — ${o.terceirizado_nome}` : ""}</span>
                     {o.equipe === "terceiro" && o.valor_execucao > 0 && <><span>·</span><span>{formatMoeda(o.valor_execucao)}</span></>}
                     <span>·</span>
-                    <span>Início: {formatData(o.data_inicio)}</span>
+                    <span>Registro: {formatData(o.data_inicio)}</span>
+                    {o.data_inicio_previsto && <><span>·</span><span>Início previsto: {formatData(o.data_inicio_previsto)}</span></>}
                     {o.data_prazo && <><span>·</span><span>Prazo: {formatData(o.data_prazo)}</span></>}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-4">
