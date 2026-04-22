@@ -47,6 +47,8 @@ export interface Venda {
   observacoes: string;
   servicos: string[];
   tipo_venda: TipoVenda;
+  arquivo_url: string | null;
+  arquivo_nome: string | null;
   created_at: string;
 }
 
@@ -122,13 +124,27 @@ export async function listarVendas(filtros?: FiltrosVendas): Promise<Venda[]> {
   }));
 }
 
-export async function criarVenda(payload: VendaPayload, servicos: string[]): Promise<void> {
+async function uploadAnexo(vendaId: string, file: File): Promise<{ url: string; nome: string }> {
+  const ext = file.name.split(".").pop() ?? "bin";
+  const path = `${vendaId}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("vendas-anexos").upload(path, file, { upsert: true });
+  if (error) throw new Error(`Erro ao enviar arquivo: ${error.message}`);
+  const { data } = supabase.storage.from("vendas-anexos").getPublicUrl(path);
+  return { url: data.publicUrl, nome: file.name };
+}
+
+export async function criarVenda(payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
   const { data: venda, error: errVenda } = await supabase
     .from("vendas")
-    .insert(payload)
+    .insert({ ...payload, arquivo_url: null, arquivo_nome: null })
     .select("id")
     .single();
   if (errVenda || !venda) throw new Error(errVenda?.message ?? "Erro ao criar venda.");
+
+  if (arquivo) {
+    const { url, nome } = await uploadAnexo(venda.id, arquivo);
+    await supabase.from("vendas").update({ arquivo_url: url, arquivo_nome: nome }).eq("id", venda.id);
+  }
 
   if (servicos.length > 0) {
     const { error: errServicos } = await supabase
@@ -141,8 +157,14 @@ export async function criarVenda(payload: VendaPayload, servicos: string[]): Pro
   }
 }
 
-export async function editarVenda(id: string, payload: VendaPayload, servicos: string[]): Promise<void> {
-  const { error: errVenda } = await supabase.from("vendas").update(payload).eq("id", id);
+export async function editarVenda(id: string, payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
+  let arquivoExtra: { arquivo_url?: string; arquivo_nome?: string } = {};
+  if (arquivo) {
+    const { url, nome } = await uploadAnexo(id, arquivo);
+    arquivoExtra = { arquivo_url: url, arquivo_nome: nome };
+  }
+
+  const { error: errVenda } = await supabase.from("vendas").update({ ...payload, ...arquivoExtra }).eq("id", id);
   if (errVenda) throw new Error(errVenda.message);
 
   const { error: errDel } = await supabase.from("venda_servicos").delete().eq("venda_id", id);

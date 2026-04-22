@@ -83,6 +83,7 @@ export default function VendasTab() {
   const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "" });
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [erroCNPJ, setErroCNPJ]         = useState<string | null>(null);
+  const [arquivo, setArquivo]           = useState<File | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
@@ -100,13 +101,13 @@ export default function VendasTab() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setView("form"); }
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
     setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor: String(r.valor), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
-    setErroForm(null); setErroCNPJ(null); setView("form");
+    setErroForm(null); setErroCNPJ(null); setArquivo(null); setView("form");
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); }
+  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
 
   async function buscarRazaoSocial(cnpjMascarado: string) {
@@ -141,8 +142,8 @@ export default function VendasTab() {
         indicado_por:    form.indicado_por.trim(),
         observacoes:     form.observacoes.trim(),
       };
-      if (editando) await editarVenda(editando.id, payload, form.servicos);
-      else           await criarVenda(payload, form.servicos);
+      if (editando) await editarVenda(editando.id, payload, form.servicos, arquivo);
+      else           await criarVenda(payload, form.servicos, arquivo);
       setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -226,6 +227,30 @@ export default function VendasTab() {
               <label className={LABEL}>Observações</label>
               <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3} placeholder="Informações adicionais sobre a venda..." className={`${INPUT} resize-none`} />
             </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className={LABEL}>Anexo <span className="font-normal normal-case text-gray-400">(PDF ou Excel)</span></label>
+              {editando?.arquivo_url && !arquivo && (
+                <div className="mb-1 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                  <span className="text-xs text-gray-500 flex-1 truncate">Atual: {editando.arquivo_nome}</span>
+                  <a href={editando.arquivo_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-folk hover:underline shrink-0">Abrir</a>
+                </div>
+              )}
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-500 transition-colors hover:border-folk/40 hover:bg-folk/5">
+                <svg className="h-5 w-5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
+                <span className="flex-1">{arquivo ? arquivo.name : "Selecionar arquivo..."}</span>
+                <input
+                  type="file"
+                  accept=".pdf,.xlsx,.xls"
+                  className="sr-only"
+                  onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {arquivo && (
+                <button type="button" onClick={() => setArquivo(null)} className="self-start text-xs text-red-400 hover:text-red-600">
+                  Remover arquivo selecionado
+                </button>
+              )}
+            </div>
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
             <div className="flex gap-3 sm:col-span-2">
               <button type="submit" disabled={salvando} className="rounded-2xl bg-folk-gradient px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-60">
@@ -291,6 +316,7 @@ export default function VendasTab() {
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Serviços</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Anexo</th>
                 <th className="py-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
             </thead>
@@ -318,6 +344,16 @@ export default function VendasTab() {
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
                       {labelTipoVenda(r.tipo_venda)}
                     </span>
+                  </td>
+                  <td className="py-3.5 pr-4">
+                    {r.arquivo_url ? (
+                      <a href={r.arquivo_url} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
+                        title={r.arquivo_nome ?? ""}>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                        Baixar
+                      </a>
+                    ) : <span className="text-sm text-gray-400">—</span>}
                   </td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">
