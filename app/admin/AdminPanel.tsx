@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { atualizarStatusUsuario } from "./actions";
+import { atualizarStatusUsuario, reenviarConfirmacao, resetarSenha } from "./actions";
 import type { Profile, UserStatus } from "@/lib/profiles";
 
 const statusLabel: Record<UserStatus, string> = {
@@ -18,15 +18,44 @@ const statusStyle: Record<UserStatus, string> = {
 
 function UserRow({ profile }: { profile: Profile }) {
   const [isPending, startTransition] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
+  const [erro, setErro]           = useState<string | null>(null);
+  const [sucesso, setSucesso]     = useState<string | null>(null);
+  const [resetando, setResetando] = useState(false);
+  const [novaSenha, setNovaSenha] = useState("");
 
   function handleAction(status: UserStatus) {
-    setErro(null);
+    setErro(null); setSucesso(null);
     startTransition(async () => {
       try {
         await atualizarStatusUsuario(profile.id, status);
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Erro ao atualizar.");
+      }
+    });
+  }
+
+  function handleReenviar() {
+    setErro(null); setSucesso(null);
+    startTransition(async () => {
+      try {
+        await reenviarConfirmacao(profile.email);
+        setSucesso("Email de confirmação reenviado.");
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao reenviar.");
+      }
+    });
+  }
+
+  function handleConfirmarSenha() {
+    setErro(null); setSucesso(null);
+    startTransition(async () => {
+      try {
+        await resetarSenha(profile.id, novaSenha);
+        setSucesso("Senha redefinida com sucesso.");
+        setResetando(false);
+        setNovaSenha("");
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao redefinir senha.");
       }
     });
   }
@@ -46,34 +75,55 @@ function UserRow({ profile }: { profile: Profile }) {
       <td className="py-3.5 pr-6">
         <div className="flex flex-wrap items-center gap-2">
           {profile.status !== "aprovado" && (
-            <button
-              onClick={() => handleAction("aprovado")}
-              disabled={isPending}
-              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-            >
+            <button onClick={() => handleAction("aprovado")} disabled={isPending}
+              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50">
               Aprovar
             </button>
           )}
           {profile.status !== "recusado" && (
-            <button
-              onClick={() => handleAction("recusado")}
-              disabled={isPending}
-              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-            >
+            <button onClick={() => handleAction("recusado")} disabled={isPending}
+              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50">
               Recusar
             </button>
           )}
           {profile.status !== "pendente" && (
-            <button
-              onClick={() => handleAction("pendente")}
-              disabled={isPending}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 disabled:opacity-50"
-            >
+            <button onClick={() => handleAction("pendente")} disabled={isPending}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 disabled:opacity-50">
               Pendente
             </button>
           )}
+          <button onClick={handleReenviar} disabled={isPending}
+            className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50">
+            Reenviar confirmação
+          </button>
+          <button onClick={() => { setResetando((v) => !v); setErro(null); setSucesso(null); setNovaSenha(""); }} disabled={isPending}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 disabled:opacity-50">
+            Resetar senha
+          </button>
         </div>
-        {erro && <p className="mt-1 text-xs text-red-600">{erro}</p>}
+
+        {resetando && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="password"
+              value={novaSenha}
+              onChange={(e) => setNovaSenha(e.target.value)}
+              placeholder="Nova senha (mín. 6 caracteres)"
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-800 outline-none focus:border-folk focus:ring-1 focus:ring-folk/10"
+            />
+            <button onClick={handleConfirmarSenha} disabled={isPending || novaSenha.length < 6}
+              className="rounded-lg bg-folk px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+              Confirmar
+            </button>
+            <button onClick={() => { setResetando(false); setNovaSenha(""); }}
+              className="text-xs text-gray-400 hover:text-gray-600">
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        {erro    && <p className="mt-1 text-xs text-red-600">{erro}</p>}
+        {sucesso && <p className="mt-1 text-xs text-green-600">{sucesso}</p>}
       </td>
     </tr>
   );
