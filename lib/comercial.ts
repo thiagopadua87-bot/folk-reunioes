@@ -91,6 +91,18 @@ export interface PipelineLog {
   campo: string;
   valor_anterior: string;
   valor_novo: string;
+  autor_nome: string | null;
+  created_at: string;
+}
+
+export interface VendaLog {
+  id: string;
+  user_id: string;
+  venda_id: string;
+  campo: string;
+  valor_anterior: string;
+  valor_novo: string;
+  autor_nome: string | null;
   created_at: string;
 }
 
@@ -176,11 +188,10 @@ export async function criarVenda(payload: VendaPayload, servicos: string[], arqu
 }
 
 export async function marcarPipelineConvertido(pipelineId: string, vendaId: string): Promise<void> {
-  const { data: item } = await supabase
-    .from("pipeline")
-    .select("status")
-    .eq("id", pipelineId)
-    .single();
+  const [{ data: item }, autorNome] = await Promise.all([
+    supabase.from("pipeline").select("status").eq("id", pipelineId).single(),
+    getAutorNome(),
+  ]);
 
   const statusAnteriorLabel = item?.status
     ? (labelStatusPipeline(item.status as StatusPipeline) ?? item.status)
@@ -198,12 +209,14 @@ export async function marcarPipelineConvertido(pipelineId: string, vendaId: stri
       campo:          "status",
       valor_anterior: statusAnteriorLabel,
       valor_novo:     "Fechado (ganho)",
+      autor_nome:     autorNome,
     },
     {
       proposta_id:    pipelineId,
       campo:          "conversao",
       valor_anterior: "pipeline",
       valor_novo:     "convertido_em_venda",
+      autor_nome:     autorNome,
     },
   ]);
 }
@@ -324,6 +337,24 @@ export async function excluirPipelineItem(id: string): Promise<void> {
 
 // ── Pipeline Logs ─────────────────────────────────────────────
 
+async function getAutorNome(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from("profiles").select("nome").eq("id", user.id).single();
+  return (data as { nome: string } | null)?.nome ?? null;
+}
+
+export async function registrarOrigemVenda(vendaId: string, pipelineId: string): Promise<void> {
+  const autorNome = await getAutorNome();
+  await supabase.from("vendas_logs").insert({
+    venda_id:       vendaId,
+    campo:          "origem",
+    valor_anterior: "pipeline",
+    valor_novo:     pipelineId,
+    autor_nome:     autorNome,
+  });
+}
+
 export async function listarLogs(propostaId: string): Promise<PipelineLog[]> {
   const { data, error } = await supabase
     .from("pipeline_logs")
@@ -340,34 +371,35 @@ async function registrarAlteracoes(
   novo: PipelinePayload,
   vendedores: Vendedor[],
 ): Promise<void> {
-  type LogInput = { proposta_id: string; campo: string; valor_anterior: string; valor_novo: string };
+  type LogInput = { proposta_id: string; campo: string; valor_anterior: string; valor_novo: string; autor_nome: string | null };
+  const autorNome = await getAutorNome();
   const logs: LogInput[] = [];
 
   if (antigo.status !== novo.status) {
-    logs.push({ proposta_id: propostaId, campo: "status", valor_anterior: labelStatusPipeline(antigo.status), valor_novo: labelStatusPipeline(novo.status) });
+    logs.push({ proposta_id: propostaId, campo: "status", valor_anterior: labelStatusPipeline(antigo.status), valor_novo: labelStatusPipeline(novo.status), autor_nome: autorNome });
   }
 
   if (antigo.temperatura !== novo.temperatura) {
-    logs.push({ proposta_id: propostaId, campo: "temperatura", valor_anterior: labelTemperatura(antigo.temperatura), valor_novo: labelTemperatura(novo.temperatura) });
+    logs.push({ proposta_id: propostaId, campo: "temperatura", valor_anterior: labelTemperatura(antigo.temperatura), valor_novo: labelTemperatura(novo.temperatura), autor_nome: autorNome });
   }
 
   if (antigo.vendedor_id !== novo.vendedor_id) {
     const nomeAntigo = antigo.vendedor_nome ?? "—";
     const nomeNovo   = vendedores.find((v) => v.id === novo.vendedor_id)?.nome ?? "—";
-    logs.push({ proposta_id: propostaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo });
+    logs.push({ proposta_id: propostaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo, autor_nome: autorNome });
   }
 
   if (antigo.valor_aproximado !== novo.valor_aproximado) {
-    logs.push({ proposta_id: propostaId, campo: "valor", valor_anterior: formatMoeda(antigo.valor_aproximado), valor_novo: formatMoeda(novo.valor_aproximado) });
+    logs.push({ proposta_id: propostaId, campo: "valor", valor_anterior: formatMoeda(antigo.valor_aproximado), valor_novo: formatMoeda(novo.valor_aproximado), autor_nome: autorNome });
   }
 
   const antigosServicos = antigo.servicos ?? [];
   const novosServicos   = novo.servicos   ?? [];
   for (const s of novosServicos.filter((s) => !antigosServicos.includes(s))) {
-    logs.push({ proposta_id: propostaId, campo: "servico_adicionado", valor_anterior: "", valor_novo: s });
+    logs.push({ proposta_id: propostaId, campo: "servico_adicionado", valor_anterior: "", valor_novo: s, autor_nome: autorNome });
   }
   for (const s of antigosServicos.filter((s) => !novosServicos.includes(s))) {
-    logs.push({ proposta_id: propostaId, campo: "servico_removido", valor_anterior: s, valor_novo: "" });
+    logs.push({ proposta_id: propostaId, campo: "servico_removido", valor_anterior: s, valor_novo: "", autor_nome: autorNome });
   }
 
   if (antigo.convertido_em_venda && logs.length > 0) {
@@ -376,6 +408,7 @@ async function registrarAlteracoes(
       campo:          "edicao_pos_conversao",
       valor_anterior: "original",
       valor_novo:     "alterado",
+      autor_nome:     autorNome,
     });
   }
 

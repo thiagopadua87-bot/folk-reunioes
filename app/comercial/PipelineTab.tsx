@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   listarPipeline, criarPipelineItem, editarPipelineItem, excluirPipelineItem,
   listarLogs,
@@ -70,17 +70,22 @@ function formatLogTs(s: string): string {
 
 // ── Formulário ───────────────────────────────────────────────
 
-function CheckboxServicos({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function CheckboxServicos({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
   function toggle(s: string) {
+    if (disabled) return;
     onChange(value.includes(s) ? value.filter((x) => x !== s) : [...value, s]);
   }
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={`flex flex-wrap gap-2 ${disabled ? "opacity-60" : ""}`}>
       {SERVICOS_COMERCIAL.map((s) => {
         const checked = value.includes(s);
         return (
-          <button key={s} type="button" onClick={() => toggle(s)}
-            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${checked ? "border-folk bg-folk text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-folk/40 hover:text-folk"}`}>
+          <button key={s} type="button" onClick={() => toggle(s)} disabled={disabled}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              disabled
+                ? `${checked ? "border-gray-300 bg-gray-200 text-gray-500" : "border-gray-200 bg-gray-100 text-gray-400"} cursor-not-allowed`
+                : checked ? "border-folk bg-folk text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-folk/40 hover:text-folk"
+            }`}>
             {s}
           </button>
         );
@@ -132,6 +137,16 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "" });
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
+
+  const logsVisiveis = useMemo(() => {
+    const conversaoLog = logs.find((l) => l.campo === "conversao");
+    if (!conversaoLog) return logs;
+    const tConversao = new Date(conversaoLog.created_at).getTime();
+    return logs.filter((l) => {
+      if (l.campo !== "status") return true;
+      return Math.abs(new Date(l.created_at).getTime() - tConversao) > 60_000;
+    });
+  }, [logs]);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
@@ -251,7 +266,10 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Cliente *</label>
-              <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente" className={INPUT} />
+              <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente"
+                disabled={!!editando?.convertido_em_venda}
+                className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
+              {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Vendedor</label>
@@ -272,11 +290,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Valor aproximado (R$)</label>
-              <input type="number" min="0" step="0.01" value={form.valor_aproximado} onChange={(e) => set("valor_aproximado", e.target.value)} placeholder="0,00" className={INPUT} />
+              <input type="number" min="0" step="0.01" value={form.valor_aproximado} onChange={(e) => set("valor_aproximado", e.target.value)} placeholder="0,00"
+                disabled={!!editando?.convertido_em_venda}
+                className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
+              {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Serviços</label>
-              <CheckboxServicos value={form.servicos} onChange={(v) => set("servicos", v)} />
+              <CheckboxServicos value={form.servicos} onChange={(v) => set("servicos", v)} disabled={!!editando?.convertido_em_venda} />
+              {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Observações</label>
@@ -299,13 +321,13 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
             {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
 
-            {!carregandoLogs && logs.length === 0 && (
+            {!carregandoLogs && logsVisiveis.length === 0 && (
               <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
             )}
 
-            {!carregandoLogs && logs.length > 0 && (
+            {!carregandoLogs && logsVisiveis.length > 0 && (
               <div>
-                {logs.map((log, i) => {
+                {logsVisiveis.map((log, i) => {
                   const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
                   const isConversao = log.campo === "conversao";
                   const isPosConversao = log.campo === "edicao_pos_conversao";
@@ -313,10 +335,13 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                     <div key={log.id} className="flex gap-3">
                       <div className="flex flex-col items-center">
                         <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                        {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
+                        {i < logsVisiveis.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
                       </div>
-                      <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
-                        <p className="text-[11px] text-gray-400 mb-0.5">{formatLogTs(log.created_at)}</p>
+                      <div className={`${i < logsVisiveis.length - 1 ? "pb-4" : ""} min-w-0`}>
+                        <p className="text-[11px] text-gray-400 mb-0.5">
+                          {formatLogTs(log.created_at)}
+                          {log.autor_nome && <span className="ml-1">· {log.autor_nome}</span>}
+                        </p>
                         {isConversao ? (
                           <p className="text-sm font-semibold text-emerald-700">✓ Proposta convertida em venda</p>
                         ) : isPosConversao ? (

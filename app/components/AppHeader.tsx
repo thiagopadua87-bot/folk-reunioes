@@ -51,7 +51,8 @@ export default function AppHeader() {
     : NAV_BASE;
 
   const isAuthPage = ["/login", "/signup", "/pendente", "/recusado"].includes(pathname);
-  if (isAuthPage) return null;
+  const isTVPage = pathname === "/comercial/tv";
+  if (isAuthPage || isTVPage) return null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">

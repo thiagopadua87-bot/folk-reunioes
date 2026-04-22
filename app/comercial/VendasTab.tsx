@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido,
+  listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido, registrarOrigemVenda,
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
   type Venda, type VendaPayload, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
@@ -169,6 +169,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         const vendaId = await criarVenda(payload, form.servicos, arquivo);
         if (preenchimento?.pipeline_id) {
           await marcarPipelineConvertido(preenchimento.pipeline_id, vendaId);
+          registrarOrigemVenda(vendaId, preenchimento.pipeline_id).catch(() => {});
           onPreenchimentoUsado?.();
         }
       }
@@ -210,6 +211,12 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-folk/20 bg-folk/5 px-4 py-3 text-sm text-folk">
             <span className="font-semibold">Pipeline →</span>
             <span>Formulário pré-preenchido a partir da proposta de <strong>{preenchimento.cliente}</strong>. Revise e confirme.</span>
+          </div>
+        )}
+        {editando?.pipeline_id && !preenchimento && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-folk/20 bg-folk/5 px-4 py-3 text-sm text-folk">
+            <span className="font-semibold">Pipeline →</span>
+            <span>Esta venda foi originada a partir de uma proposta do pipeline.</span>
           </div>
         )}
         <Card className="p-6">
