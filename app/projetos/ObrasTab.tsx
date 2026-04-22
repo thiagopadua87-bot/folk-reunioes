@@ -184,6 +184,7 @@ export default function ObrasTab() {
         valor_execucao:  form.equipe === "terceiro" ? (parseFloat(form.valor_execucao.replace(",", ".")) || 0) : 0,
         andamento,
         observacoes:     form.observacoes.trim(),
+        venda_id:        null,
       };
       const idEditado = editando?.id ?? null;
       if (editando) await editarObra(editando.id, payload, editando, tecnicos, terceirizados);
