@@ -1,0 +1,4 @@
+ALTER TABLE public.pipeline ADD COLUMN IF NOT EXISTS convertido_em_venda BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.pipeline ADD COLUMN IF NOT EXISTS venda_id UUID REFERENCES public.vendas(id) ON DELETE SET NULL;
+
+ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS pipeline_id UUID REFERENCES public.pipeline(id) ON DELETE SET NULL;

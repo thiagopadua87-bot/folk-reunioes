@@ -3,6 +3,7 @@
 import { useState } from "react";
 import VendasTab from "./VendasTab";
 import PipelineTab from "./PipelineTab";
+import type { PreenchimentoVenda, PipelineItem } from "@/lib/comercial";
 
 type Aba = "vendas" | "pipeline";
 
@@ -13,7 +14,21 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
 
 export default function ComercialPage() {
   const [aba, setAba] = useState<Aba>("vendas");
+  const [preenchimento, setPreenchimento] = useState<PreenchimentoVenda | null>(null);
   const abaAtual = ABAS.find((a) => a.value === aba)!;
+
+  function handleConverter(item: PipelineItem) {
+    setPreenchimento({
+      pipeline_id:  item.id,
+      cliente:      item.cliente,
+      vendedor_id:  item.vendedor_id,
+      valor:        item.valor_aproximado,
+      servicos:     item.servicos ?? [],
+      observacoes:  item.observacoes,
+      indicado_por: item.indicado_por,
+    });
+    setAba("vendas");
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -36,8 +51,18 @@ export default function ComercialPage() {
         ))}
       </div>
 
-      {aba === "vendas"   && <VendasTab />}
-      {aba === "pipeline" && <PipelineTab />}
+      {aba === "vendas" && (
+        <VendasTab
+          preenchimento={preenchimento}
+          onPreenchimentoUsado={() => setPreenchimento(null)}
+        />
+      )}
+      {aba === "pipeline" && (
+        <PipelineTab
+          onConverter={handleConverter}
+          onIrParaVendas={() => setAba("vendas")}
+        />
+      )}
     </main>
   );
 }

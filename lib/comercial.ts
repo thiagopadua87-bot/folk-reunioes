@@ -51,6 +51,7 @@ export interface Venda {
   arquivo_url: string | null;
   arquivo_nome: string | null;
   enviado_para_projetos: boolean;
+  pipeline_id: string | null;
   created_at: string;
 }
 
@@ -67,7 +68,19 @@ export interface PipelineItem {
   indicado_por: string;
   observacoes: string;
   servicos: string[];
+  convertido_em_venda: boolean;
+  venda_id: string | null;
   created_at: string;
+}
+
+export interface PreenchimentoVenda {
+  pipeline_id: string;
+  cliente: string;
+  vendedor_id: string | null;
+  valor: number;
+  servicos: string[];
+  observacoes: string;
+  indicado_por: string;
 }
 
 export interface PipelineLog {
@@ -135,7 +148,7 @@ async function uploadAnexo(vendaId: string, file: File): Promise<{ url: string; 
   return { url: data.publicUrl, nome: file.name };
 }
 
-export async function criarVenda(payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
+export async function criarVenda(payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<string> {
   const { data: venda, error: errVenda } = await supabase
     .from("vendas")
     .insert({ ...payload, arquivo_url: null, arquivo_nome: null })
@@ -157,6 +170,16 @@ export async function criarVenda(payload: VendaPayload, servicos: string[], arqu
       throw new Error(errServicos.message);
     }
   }
+
+  return venda.id;
+}
+
+export async function marcarPipelineConvertido(pipelineId: string, vendaId: string): Promise<void> {
+  const { error } = await supabase
+    .from("pipeline")
+    .update({ convertido_em_venda: true, venda_id: vendaId })
+    .eq("id", pipelineId);
+  if (error) throw new Error(error.message);
 }
 
 export async function editarVenda(id: string, payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
@@ -224,7 +247,7 @@ export async function criarObraAPartirDaVenda(venda: Venda): Promise<string> {
 
 // ── Pipeline ─────────────────────────────────────────────────
 
-export type PipelinePayload = Omit<PipelineItem, "id" | "user_id" | "created_at" | "vendedor_nome">;
+export type PipelinePayload = Omit<PipelineItem, "id" | "user_id" | "created_at" | "vendedor_nome" | "convertido_em_venda" | "venda_id">;
 
 export interface FiltrosPipeline {
   temperatura?: Temperatura | "";

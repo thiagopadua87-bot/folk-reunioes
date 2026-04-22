@@ -107,7 +107,12 @@ const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
 // ── Componente principal ─────────────────────────────────────
 
-export default function PipelineTab() {
+interface PipelineTabProps {
+  onConverter: (item: PipelineItem) => void;
+  onIrParaVendas: () => void;
+}
+
+export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTabProps) {
   const [registros, setRegistros]   = useState<PipelineItem[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -118,6 +123,7 @@ export default function PipelineTab() {
   const [salvando, setSalvando]     = useState(false);
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
+  const [convertendo, setConvertendo] = useState<string | null>(null);
   const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "" });
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
@@ -196,6 +202,11 @@ export default function PipelineTab() {
     try { await excluirPipelineItem(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
     finally { setExcluindo(null); }
+  }
+
+  function handleConverter(item: PipelineItem) {
+    setConvertendo(item.id);
+    onConverter(item);
   }
 
   const totalPotencial = registros
@@ -375,11 +386,29 @@ export default function PipelineTab() {
                   )}
                   {r.observacoes && <p className="mt-2 text-xs text-gray-400 italic">{r.observacoes}</p>}
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-                  <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-                    {excluindo === r.id ? "..." : "Excluir"}
-                  </button>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
+                    <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+                      {excluindo === r.id ? "..." : "Excluir"}
+                    </button>
+                  </div>
+                  {r.convertido_em_venda ? (
+                    <button
+                      onClick={onIrParaVendas}
+                      className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
+                    >
+                      ✓ Convertido — Ver vendas
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleConverter(r)}
+                      disabled={convertendo === r.id}
+                      className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
+                    >
+                      {convertendo === r.id ? "Abrindo..." : "→ Converter em venda"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

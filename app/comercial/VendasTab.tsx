@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda,
+  listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido,
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
-  type Venda, type VendaPayload, type TipoVenda, type FiltrosVendas,
+  type Venda, type VendaPayload, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
@@ -69,14 +69,33 @@ function CheckboxServicos({ value, onChange }: { value: string[]; onChange: (v: 
   );
 }
 
-export default function VendasTab() {
+interface VendasTabProps {
+  preenchimento?: PreenchimentoVenda | null;
+  onPreenchimentoUsado?: () => void;
+}
+
+function formDePreenchimento(p: PreenchimentoVenda): FormState {
+  return {
+    data_fechamento: new Date().toISOString().slice(0, 10),
+    vendedor_id:     p.vendedor_id ?? "",
+    cnpj:            "",
+    cliente:         p.cliente,
+    valor:           String(p.valor || ""),
+    servicos:        p.servicos,
+    tipo_venda:      "recorrente",
+    indicado_por:    p.indicado_por,
+    observacoes:     p.observacoes,
+  };
+}
+
+export default function VendasTab({ preenchimento, onPreenchimentoUsado }: VendasTabProps) {
   const [registros, setRegistros] = useState<Venda[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [view, setView] = useState<"list" | "form">("list");
+  const [view, setView] = useState<"list" | "form">(preenchimento ? "form" : "list");
   const [editando, setEditando] = useState<Venda | null>(null);
-  const [form, setForm] = useState<FormState>(FORM_VAZIO);
+  const [form, setForm] = useState<FormState>(preenchimento ? formDePreenchimento(preenchimento) : FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
@@ -108,7 +127,7 @@ export default function VendasTab() {
     setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor: String(r.valor), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
     setErroForm(null); setErroCNPJ(null); setArquivo(null); setView("form");
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); }
+  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); onPreenchimentoUsado?.(); }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
 
   async function buscarRazaoSocial(cnpjMascarado: string) {
@@ -142,9 +161,17 @@ export default function VendasTab() {
         tipo_venda:      form.tipo_venda,
         indicado_por:    form.indicado_por.trim(),
         observacoes:     form.observacoes.trim(),
+        pipeline_id:     preenchimento?.pipeline_id ?? (editando?.pipeline_id ?? null),
       };
-      if (editando) await editarVenda(editando.id, payload, form.servicos, arquivo);
-      else           await criarVenda(payload, form.servicos, arquivo);
+      if (editando) {
+        await editarVenda(editando.id, payload, form.servicos, arquivo);
+      } else {
+        const vendaId = await criarVenda(payload, form.servicos, arquivo);
+        if (preenchimento?.pipeline_id) {
+          await marcarPipelineConvertido(preenchimento.pipeline_id, vendaId);
+          onPreenchimentoUsado?.();
+        }
+      }
       setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -179,6 +206,12 @@ export default function VendasTab() {
           <button onClick={cancelar} className="text-sm text-gray-400 hover:text-gray-600">← Voltar</button>
           <h2 className="text-lg font-bold text-gray-900">{editando ? "Editar venda" : "Nova venda"}</h2>
         </div>
+        {preenchimento && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-folk/20 bg-folk/5 px-4 py-3 text-sm text-folk">
+            <span className="font-semibold">Pipeline →</span>
+            <span>Formulário pré-preenchido a partir da proposta de <strong>{preenchimento.cliente}</strong>. Revise e confirme.</span>
+          </div>
+        )}
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -355,9 +388,14 @@ export default function VendasTab() {
                   </td>
                   <td className="py-3.5 pr-4 text-sm font-semibold text-gray-800">{formatMoeda(r.valor)}</td>
                   <td className="py-3.5 pr-4">
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
-                      {labelTipoVenda(r.tipo_venda)}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
+                        {labelTipoVenda(r.tipo_venda)}
+                      </span>
+                      {r.pipeline_id && (
+                        <span className="text-[10px] font-semibold text-folk/70">via Pipeline</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 pr-4">
                     {r.arquivo_url ? (
