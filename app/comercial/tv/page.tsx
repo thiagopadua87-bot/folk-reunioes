@@ -56,6 +56,7 @@ export default function ComercialTVPage() {
   const [erro,                setErro]                = useState<string | null>(null);
   const [ultimaAtualizacao,   setUltimaAtualizacao]   = useState<Date | null>(null);
   const [relogio,             setRelogio]             = useState(() => new Date());
+  const [debug,               setDebug]               = useState({ totalVendas: 0, portariaCount: 0, userEmail: "" });
 
   const audioRef       = useRef<HTMLAudioElement | null>(null);
   const somAtivoRef    = useRef(false);
@@ -87,6 +88,7 @@ export default function ComercialTVPage() {
 
   const carregar = useCallback(async (inicial = false) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const [novasVendas, novoPipeline] = await Promise.all([
         listarVendas({ dataInicio: getMesInicio(), dataFim: getMesFim() }),
         listarPipeline(),
@@ -121,6 +123,7 @@ export default function ComercialTVPage() {
       setPipeline(novoPipeline);
       setErro(null);
       setUltimaAtualizacao(new Date());
+      setDebug({ totalVendas: novasVendas.length, portariaCount: portaria.length, userEmail: user?.email ?? "não autenticado" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro desconhecido";
       console.error("[TV] Erro ao carregar:", msg);
@@ -227,7 +230,19 @@ export default function ComercialTVPage() {
         }
       `}</style>
 
-      <div className="flex h-screen flex-col overflow-hidden bg-gray-950 text-white" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+      <div className="relative flex h-screen flex-col overflow-hidden bg-gray-950 text-white" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+
+        {/* DIAGNÓSTICO — aparece quando não há vendas portaria após primeira carga */}
+        {totalContratos === 0 && ultimaAtualizacao && (
+          <div className="absolute bottom-5 left-5 z-50 rounded-2xl border border-yellow-500/40 bg-gray-950/95 p-4 font-mono text-xs text-yellow-300 shadow-xl">
+            <p className="mb-2 font-bold text-yellow-400">⚠ Diagnóstico — sem dados</p>
+            <p>Usuário: <span className="text-white">{debug.userEmail}</span></p>
+            <p>Vendas no mês (total): <span className="text-white">{debug.totalVendas}</span></p>
+            <p>Com Portaria Remota: <span className="text-white">{debug.portariaCount}</span></p>
+            <p>Período buscado: <span className="text-white">{getMesInicio()} → {getMesFim()}</span></p>
+            {erro && <p className="mt-1 text-red-400">Erro: {erro}</p>}
+          </div>
+        )}
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="flex shrink-0 items-center justify-between border-b border-gray-800/80 bg-gray-950/90 px-8 py-3">
