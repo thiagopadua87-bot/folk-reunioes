@@ -18,15 +18,12 @@ const MESES_PT = [
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function getMesInicio(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-01`;
+function getAnoInicio(): string {
+  return `${new Date().getFullYear()}-01-01`;
 }
 
-function getMesFim(): string {
-  const n = new Date();
-  const d = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+function getAnoFim(): string {
+  return `${new Date().getFullYear()}-12-31`;
 }
 
 function getNivel(pct: number): { label: string; cor: string; gradiente: string } {
@@ -90,7 +87,7 @@ export default function ComercialTVPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const [novasVendas, novoPipeline] = await Promise.all([
-        listarVendas({ dataInicio: getMesInicio(), dataFim: getMesFim() }),
+        listarVendas({ dataInicio: getAnoInicio(), dataFim: getAnoFim() }),
         listarPipeline(),
       ]);
 
@@ -176,7 +173,7 @@ export default function ComercialTVPage() {
   const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
   const pipelineConvertidos = pipeline.filter((p) => p.status === "fechado_ganho").length;
 
-  const mesLabel  = `${MESES_PT[relogio.getMonth()]} ${relogio.getFullYear()}`;
+  const mesLabel  = `Meta ${relogio.getFullYear()}`;
   const horaLabel = relogio.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   // ── Loading ────────────────────────────────────────────────
@@ -239,7 +236,7 @@ export default function ComercialTVPage() {
             <p>Usuário: <span className="text-white">{debug.userEmail}</span></p>
             <p>Vendas no mês (total): <span className="text-white">{debug.totalVendas}</span></p>
             <p>Com Portaria Remota: <span className="text-white">{debug.portariaCount}</span></p>
-            <p>Período buscado: <span className="text-white">{getMesInicio()} → {getMesFim()}</span></p>
+            <p>Período buscado: <span className="text-white">{getAnoInicio()} → {getAnoFim()}</span></p>
             {erro && <p className="mt-1 text-red-400">Erro: {erro}</p>}
           </div>
         )}
@@ -302,7 +299,7 @@ export default function ComercialTVPage() {
 
             <div className="flex items-start justify-between">
               <div className="fade-up" key={`receita-${totalReceita}`}>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Meta do mês — Portaria Remota</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Meta anual — Portaria Remota</p>
                 <p className="mt-2 text-8xl font-black leading-none tracking-tighter text-white">
                   {formatMoeda(totalReceita)}
                 </p>
