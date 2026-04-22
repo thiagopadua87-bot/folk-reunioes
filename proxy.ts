@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const ROTAS_AUTH   = ["/login", "/signup"];
 const ROTAS_STATUS = ["/pendente", "/recusado"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Detecta cookie de sessão do Supabase (formato: sb-<ref>-auth-token)
