@@ -19,16 +19,25 @@ export default async function AdminPage() {
 
   if (profile?.role !== "admin") redirect("/");
 
-  const admin = createAdminSupabase();
-  const { data: profiles, error } = await admin
-    .from("profiles")
-    .select("id, nome, email, role, status, created_at")
-    .order("created_at", { ascending: false });
+  let profiles: Profile[] | null = null;
+  let erroAdmin: string | null = null;
 
-  if (error) {
+  try {
+    const admin = createAdminSupabase();
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, nome, email, role, status, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    profiles = data as Profile[];
+  } catch (e) {
+    erroAdmin = e instanceof Error ? e.message : "Erro desconhecido.";
+  }
+
+  if (erroAdmin) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
-        <p className="text-sm text-red-600">Erro ao carregar usuários: {error.message}</p>
+        <p className="text-sm text-red-600">Erro ao carregar usuários: {erroAdmin}</p>
       </main>
     );
   }

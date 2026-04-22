@@ -2,6 +2,7 @@
 
 import { createAdminSupabase } from "@/lib/supabase-admin";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { enviarEmail, emailCadastroAprovado } from "@/lib/email";
 import { revalidatePath } from "next/cache";
 import type { UserStatus } from "@/lib/profiles";
 
@@ -23,12 +24,28 @@ export async function atualizarStatusUsuario(userId: string, status: UserStatus)
   await assertAdmin();
 
   const admin = createAdminSupabase();
+  const { data: profile, error: errGet } = await admin
+    .from("profiles")
+    .select("nome, email, status")
+    .eq("id", userId)
+    .single();
+
+  if (errGet) throw new Error(errGet.message);
+
   const { error } = await admin
     .from("profiles")
     .update({ status })
     .eq("id", userId);
 
   if (error) throw new Error(error.message);
+
+  if (status === "aprovado" && profile?.status !== "aprovado") {
+    enviarEmail(
+      profile.email,
+      "Acesso aprovado — Folk Reuniões",
+      emailCadastroAprovado(profile.nome),
+    ).catch(() => {});
+  }
 
   revalidatePath("/admin");
 }

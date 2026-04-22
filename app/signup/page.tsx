@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Alert, Card } from "@/app/components/ui";
 import LogoFolk from "@/app/components/LogoFolk";
+import { notificarCadastroCriado } from "./actions";
 
 export default function SignupPage() {
   const [nome, setNome] = useState("");
@@ -33,6 +34,7 @@ export default function SignupPage() {
       return;
     }
 
+    notificarCadastroCriado(nome, email).catch(() => {});
     setSucesso(true);
     setLoading(false);
   }
