@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import ProjetosTab from "./ProjetosTab";
 import ObrasTab from "./ObrasTab";
 
@@ -17,9 +18,17 @@ export default function ProjetosPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Gerência de Projetos</h1>
-        <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gerência de Projetos</h1>
+          <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
+        </div>
+        <Link
+          href="/projetos/dashboard"
+          className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:border-folk/30 hover:text-folk"
+        >
+          📊 Dashboard
+        </Link>
       </div>
 
       <div className="mb-8 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
