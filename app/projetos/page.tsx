@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import ProjetosTab from "./ProjetosTab";
 import ObrasTab from "./ObrasTab";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 type Aba = "projetos" | "obras";
 
@@ -15,6 +16,8 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
 export default function ProjetosPage() {
   const [aba, setAba] = useState<Aba>("projetos");
   const abaAtual = ABAS.find((a) => a.value === aba)!;
+  const { guardCancel } = useUnsavedChanges();
+  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); };
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -35,7 +38,7 @@ export default function ProjetosPage() {
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setAba(value)}
+            onClick={() => trocarAba(value)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition-colors ${
               aba === value ? "bg-folk text-white shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import VendasTab from "./VendasTab";
 import PipelineTab from "./PipelineTab";
 import type { PreenchimentoVenda, PipelineItem } from "@/lib/comercial";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 type Aba = "vendas" | "pipeline";
 
@@ -16,6 +17,9 @@ export default function ComercialPage() {
   const [aba, setAba] = useState<Aba>("vendas");
   const [preenchimento, setPreenchimento] = useState<PreenchimentoVenda | null>(null);
   const abaAtual = ABAS.find((a) => a.value === aba)!;
+  const { guardCancel } = useUnsavedChanges();
+
+  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); }
 
   function handleConverter(item: PipelineItem) {
     setPreenchimento({
@@ -41,7 +45,7 @@ export default function ComercialPage() {
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setAba(value)}
+            onClick={() => trocarAba(value)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition-colors ${
               aba === value ? "bg-folk text-white shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}

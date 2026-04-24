@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ClientesPerdidos from "./ClientesPerdidos";
 import GestaoCrise from "./GestaoCrise";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 type Aba = "clientes-perdidos" | "gestao-crise";
 
@@ -13,8 +14,9 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
 
 export default function OperacionalPage() {
   const [aba, setAba] = useState<Aba>("clientes-perdidos");
-
   const abaAtual = ABAS.find((a) => a.value === aba)!;
+  const { guardCancel } = useUnsavedChanges();
+  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); };
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -29,7 +31,7 @@ export default function OperacionalPage() {
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setAba(value)}
+            onClick={() => trocarAba(value)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition-colors ${
               aba === value
                 ? "bg-folk text-white shadow-sm"
