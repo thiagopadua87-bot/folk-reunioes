@@ -137,6 +137,9 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [enviando, setEnviando]       = useState<string | null>(null);
   const [visualizando, setVisualizando] = useState<Venda | null>(null);
   const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "" });
+  const [pagina, setPagina]       = useState(1);
+  const [porPagina, setPorPagina] = useState(10);
+  const [total, setTotal]         = useState(0);
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [erroCNPJ, setErroCNPJ]         = useState<string | null>(null);
   const [arquivo, setArquivo]           = useState<File | null>(null);
@@ -146,18 +149,24 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
     try {
-      const [lista, vends] = await Promise.all([
-        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined }),
+      const [pagina_dados, vends] = await Promise.all([
+        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, pagina, porPagina }),
         listarVendedores({ ativo: true }),
       ]);
-      setRegistros(lista);
+      setRegistros(pagina_dados.registros);
+      setTotal(pagina_dados.total);
       setVendedores(vends);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally { setCarregando(false); }
-  }, [filtros]);
+  }, [filtros, pagina, porPagina]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  function setFiltrosEResetar(fn: (f: FiltrosVendas) => FiltrosVendas) {
+    setPagina(1);
+    setFiltros(fn);
+  }
 
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
@@ -250,6 +259,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
   const totalImplantacao = registros.reduce((acc, r) => acc + r.valor_implantacao, 0);
   const totalMensal      = registros.reduce((acc, r) => acc + r.valor_mensal, 0);
+  const totalPaginas     = Math.ceil(total / porPagina);
 
   if (view === "form") {
     return (
@@ -439,15 +449,15 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Fechamento — de</label>
-            <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltros((f) => ({ ...f, dataInicio: e.target.value }))} className={INPUT} />
+            <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, dataInicio: e.target.value }))} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Fechamento — até</label>
-            <input type="date" value={filtros.dataFim} onChange={(e) => setFiltros((f) => ({ ...f, dataFim: e.target.value }))} className={INPUT} />
+            <input type="date" value={filtros.dataFim} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, dataFim: e.target.value }))} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Tipo de venda</label>
-            <select value={filtros.tipoVenda} onChange={(e) => setFiltros((f) => ({ ...f, tipoVenda: e.target.value as TipoVenda | "" }))} className={INPUT}>
+            <select value={filtros.tipoVenda} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, tipoVenda: e.target.value as TipoVenda | "" }))} className={INPUT}>
               <option value="">Todos</option>
               {TIPOS_VENDA.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
@@ -455,9 +465,10 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         </div>
       </Card>
 
+
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} venda${registros.length !== 1 ? "s" : ""}`}</p>
+          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${total} venda${total !== 1 ? "s" : ""}`}</p>
           {registros.length > 0 && (
             <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
               {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
@@ -473,7 +484,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
       {erro && <Alert status="error" message={erro} />}
 
-      {!carregando && registros.length === 0 && !erro && (
+      {!carregando && total === 0 && !erro && (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">Nenhuma venda registrada.</div>
       )}
 
@@ -562,6 +573,68 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>
+              Mostrando {Math.min((pagina - 1) * porPagina + 1, total)}–{Math.min(pagina * porPagina, total)} de {total} registro{total !== 1 ? "s" : ""}
+            </span>
+            <span className="text-gray-300">·</span>
+            <label className="flex items-center gap-1.5">
+              <span>Exibir</span>
+              <select
+                value={porPagina}
+                onChange={(e) => { setPorPagina(Number(e.target.value)); setPagina(1); }}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 outline-none focus:border-folk"
+              >
+                {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina === 1}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Anterior
+            </button>
+            {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPaginas || Math.abs(p - pagina) <= 1)
+              .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("…");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === "…" ? (
+                  <span key={`ellipsis-${i}`} className="px-2 text-xs text-gray-400">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPagina(p as number)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      pagina === p
+                        ? "border-folk bg-folk text-white"
+                        : "border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina === totalPaginas}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Próximo →
+            </button>
+          </div>
         </div>
       )}
     </div>

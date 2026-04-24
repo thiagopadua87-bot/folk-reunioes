@@ -132,6 +132,13 @@ export interface FiltrosVendas {
   dataInicio?: string;
   dataFim?: string;
   tipoVenda?: TipoVenda | "";
+  pagina?: number;
+  porPagina?: number;
+}
+
+export interface PaginaVendas {
+  registros: Venda[];
+  total: number;
 }
 
 type RawVenda = Omit<Venda, "servicos" | "vendedor_nome"> & {
@@ -139,26 +146,36 @@ type RawVenda = Omit<Venda, "servicos" | "vendedor_nome"> & {
   vendedores: { nome: string } | null;
 };
 
-export async function listarVendas(filtros?: FiltrosVendas): Promise<Venda[]> {
+function mapRawVenda({ venda_servicos, vendedores, ...v }: RawVenda): Venda {
+  const row = v as Record<string, unknown>;
+  return {
+    ...v,
+    valor_implantacao: (row.valor_implantacao as number) ?? (row.valor as number) ?? 0,
+    valor_mensal:      (row.valor_mensal as number) ?? 0,
+    servicos:      venda_servicos.map((vs) => vs.servico),
+    vendedor_nome: vendedores?.nome ?? null,
+  };
+}
+
+export async function listarVendas(filtros?: FiltrosVendas): Promise<PaginaVendas> {
+  const pagina    = filtros?.pagina    ?? 1;
+  const porPagina = filtros?.porPagina ?? 10;
+  const offset    = (pagina - 1) * porPagina;
+
   let q = supabase
     .from("vendas")
-    .select("*, venda_servicos(servico), vendedores!vendedor_id(nome)")
-    .order("data_fechamento", { ascending: false });
+    .select("*, venda_servicos(servico), vendedores!vendedor_id(nome)", { count: "exact" })
+    .order("data_fechamento", { ascending: false })
+    .range(offset, offset + porPagina - 1);
   if (filtros?.dataInicio) q = q.gte("data_fechamento", filtros.dataInicio);
   if (filtros?.dataFim)    q = q.lte("data_fechamento", filtros.dataFim);
   if (filtros?.tipoVenda)  q = q.eq("tipo_venda", filtros.tipoVenda);
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error) throw new Error(error.message);
-  return (data as RawVenda[] ?? []).map(({ venda_servicos, vendedores, ...v }) => {
-    const row = v as Record<string, unknown>;
-    return {
-      ...v,
-      valor_implantacao: (row.valor_implantacao as number) ?? (row.valor as number) ?? 0,
-      valor_mensal:      (row.valor_mensal as number) ?? 0,
-      servicos:      venda_servicos.map((vs) => vs.servico),
-      vendedor_nome: vendedores?.nome ?? null,
-    };
-  });
+  return {
+    registros: (data as RawVenda[] ?? []).map(mapRawVenda),
+    total:     count ?? 0,
+  };
 }
 
 async function uploadAnexo(vendaId: string, file: File): Promise<{ url: string; nome: string }> {

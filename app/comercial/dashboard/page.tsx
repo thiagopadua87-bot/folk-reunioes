@@ -129,12 +129,12 @@ export default function ComercialDashboardPage() {
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
     try {
-      const [v, p, vends] = await Promise.all([
-        listarVendas(),
+      const [paginaVendas, p, vends] = await Promise.all([
+        listarVendas({ porPagina: 10000 }),
         listarPipeline(),
         listarVendedores({ ativo: true }),
       ]);
-      setVendas(v);
+      setVendas(paginaVendas.registros);
       setPipeline(p);
       setVendedores(vends);
     } catch (e) {

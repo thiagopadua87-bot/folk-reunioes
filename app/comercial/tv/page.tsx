@@ -86,10 +86,11 @@ export default function ComercialTVPage() {
   const carregar = useCallback(async (inicial = false) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const [novasVendas, novoPipeline] = await Promise.all([
-        listarVendas({ dataInicio: getAnoInicio(), dataFim: getAnoFim() }),
+      const [paginaVendas, novoPipeline] = await Promise.all([
+        listarVendas({ dataInicio: getAnoInicio(), dataFim: getAnoFim(), porPagina: 10000 }),
         listarPipeline(),
       ]);
+      const novasVendas = paginaVendas.registros;
 
       const portaria    = novasVendas.filter((v) => v.servicos?.includes("Portaria Remota"));
       const maisRecente = [...novasVendas].sort(
