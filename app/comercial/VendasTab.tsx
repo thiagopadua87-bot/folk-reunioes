@@ -506,7 +506,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                 <th className="w-40 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="w-28 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
                 <th className="w-32 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
-                <th className="w-28 py-3 pr-5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
+                <th className="w-44 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -515,11 +515,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                   <td className="py-3 pl-5 pr-3 text-xs text-gray-500 whitespace-nowrap">{formatData(r.data_fechamento)}</td>
                   <td className="py-3 pr-3">
                     <p className="text-sm font-medium text-gray-900 truncate">{r.cliente}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {r.vendedor_nome || ""}
-                      {r.cnpj && r.vendedor_nome ? " · " : ""}
-                      {r.cnpj ? formatarCNPJ(r.cnpj) : ""}
-                    </p>
+                    {r.vendedor_nome && <p className="text-xs text-gray-400 truncate">{r.vendedor_nome}</p>}
+                    {r.cnpj && <p className="text-xs text-gray-400 truncate">{formatarCNPJ(r.cnpj)}</p>}
                   </td>
                   <td className="py-3 pr-3">
                     {r.servicos?.length > 0 ? (
@@ -564,8 +561,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       )}
                     </div>
                   </td>
-                  <td className="py-3 pr-5">
-                    <div className="flex items-center gap-1">
+                  <td className="py-3 pr-3">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
                       <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
                       <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
