@@ -161,7 +161,7 @@ export default function ComercialDashboardPage() {
   // ── KPIs ────────────────────────────────────────────────────
 
   const totalVendas    = filtradas.length;
-  const receitaTotal   = filtradas.reduce((s, v) => s + v.valor, 0);
+  const receitaTotal   = filtradas.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
   const ticketMedio    = totalVendas > 0 ? receitaTotal / totalVendas : 0;
   const recorrentes    = filtradas.filter((v) => v.tipo_venda === "recorrente");
   const pctRecorrente  = totalVendas > 0 ? Math.round((recorrentes.length / totalVendas) * 100) : 0;
@@ -175,7 +175,7 @@ export default function ComercialDashboardPage() {
     const vendasComServico = filtradas.filter((v) => v.servicos?.includes(s));
     return {
       servico: s,
-      receita: vendasComServico.reduce((acc, v) => acc + v.valor, 0),
+      receita: vendasComServico.reduce((acc, v) => acc + v.valor_implantacao + v.valor_mensal, 0),
       contratos: vendasComServico.length,
     };
   }).filter((s) => s.contratos > 0).sort((a, b) => b.receita - a.receita);
@@ -189,7 +189,7 @@ export default function ComercialDashboardPage() {
     return {
       key,
       label:     labelMes(key),
-      receita:   doMes.reduce((s, v) => s + v.valor, 0),
+      receita:   doMes.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0),
       contratos: doMes.length,
       recorrente: doMes.filter((v) => v.tipo_venda === "recorrente").length,
     };
@@ -203,7 +203,7 @@ export default function ComercialDashboardPage() {
       const nome = v.vendedor_nome ?? "Sem vendedor";
       if (!acc[nome]) acc[nome] = { nome, contratos: 0, receita: 0, recorrente: 0, pipeline: 0 };
       acc[nome].contratos  += 1;
-      acc[nome].receita    += v.valor;
+      acc[nome].receita    += v.valor_implantacao + v.valor_mensal;
       if (v.tipo_venda === "recorrente")  acc[nome].recorrente += 1;
       if (v.pipeline_id)                 acc[nome].pipeline   += 1;
       return acc;
@@ -235,8 +235,8 @@ export default function ComercialDashboardPage() {
 
   // ── Tipo de venda ────────────────────────────────────────────
 
-  const receitaRecorrente  = recorrentes.reduce((s, v) => s + v.valor, 0);
-  const receitaDireta      = filtradas.filter((v) => v.tipo_venda === "venda_direta").reduce((s, v) => s + v.valor, 0);
+  const receitaRecorrente  = recorrentes.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
+  const receitaDireta      = filtradas.filter((v) => v.tipo_venda === "venda_direta").reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -388,13 +388,13 @@ export default function ComercialDashboardPage() {
                           {/* Recorrente */}
                           <div
                             className="w-4 rounded-t-md bg-[#F05A28]/80 transition-all duration-700"
-                            style={{ height: maxMes > 0 ? `${(m.recorrente > 0 ? (filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="recorrente").reduce((s,v)=>s+v.valor,0) / maxMes) * 68 : 2)}px` : "2px" }}
-                            title={`Recorrente: ${formatMoeda(filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="recorrente").reduce((s,v)=>s+v.valor,0))}`}
+                            style={{ height: maxMes > 0 ? `${(m.recorrente > 0 ? (filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="recorrente").reduce((s,v)=>s+v.valor_implantacao+v.valor_mensal,0) / maxMes) * 68 : 2)}px` : "2px" }}
+                            title={`Recorrente: ${formatMoeda(filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="recorrente").reduce((s,v)=>s+v.valor_implantacao+v.valor_mensal,0))}`}
                           />
                           {/* Direta */}
                           <div
                             className="w-4 rounded-t-md bg-[#6366f1]/80 transition-all duration-700"
-                            style={{ height: maxMes > 0 ? `${(filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="venda_direta").reduce((s,v)=>s+v.valor,0) / maxMes) * 68}px` : "2px" }}
+                            style={{ height: maxMes > 0 ? `${(filtradas.filter(v => v.data_fechamento.slice(0,7)===m.key && v.tipo_venda==="venda_direta").reduce((s,v)=>s+v.valor_implantacao+v.valor_mensal,0) / maxMes) * 68}px` : "2px" }}
                             title="Venda direta"
                           />
                         </div>

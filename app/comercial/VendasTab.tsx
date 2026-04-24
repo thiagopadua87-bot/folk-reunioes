@@ -16,7 +16,8 @@ const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
   cliente:          { label: "Cliente",            dot: "bg-gray-500" },
   cnpj:             { label: "CNPJ",               dot: "bg-gray-400" },
   vendedor:         { label: "Vendedor",            dot: "bg-blue-400" },
-  valor:            { label: "Valor",               dot: "bg-green-500" },
+  valor_implantacao: { label: "Valor de implantação", dot: "bg-green-500" },
+  valor_mensal:      { label: "Valor mensal",         dot: "bg-emerald-400" },
   tipo_venda:       { label: "Tipo de venda",       dot: "bg-purple-400" },
   indicado_por:     { label: "Indicado por",        dot: "bg-amber-400" },
   observacoes:      { label: "Observações",         dot: "bg-amber-300" },
@@ -49,7 +50,8 @@ interface FormState {
   vendedor_id: string;
   cnpj: string;
   cliente: string;
-  valor: string;
+  valor_implantacao: string;
+  valor_mensal: string;
   servicos: string[];
   tipo_venda: TipoVenda;
   indicado_por: string;
@@ -61,7 +63,8 @@ const FORM_VAZIO: FormState = {
   vendedor_id: "",
   cnpj: "",
   cliente: "",
-  valor: "",
+  valor_implantacao: "",
+  valor_mensal: "",
   servicos: [],
   tipo_venda: "recorrente",
   indicado_por: "",
@@ -106,15 +109,16 @@ interface VendasTabProps {
 
 function formDePreenchimento(p: PreenchimentoVenda): FormState {
   return {
-    data_fechamento: new Date().toISOString().slice(0, 10),
-    vendedor_id:     p.vendedor_id ?? "",
-    cnpj:            "",
-    cliente:         p.cliente,
-    valor:           String(p.valor || ""),
-    servicos:        p.servicos,
-    tipo_venda:      "recorrente",
-    indicado_por:    p.indicado_por,
-    observacoes:     p.observacoes,
+    data_fechamento:   new Date().toISOString().slice(0, 10),
+    vendedor_id:       p.vendedor_id ?? "",
+    cnpj:              "",
+    cliente:           p.cliente,
+    valor_implantacao: String(p.valor_implantacao || ""),
+    valor_mensal:      String(p.valor_mensal || ""),
+    servicos:          p.servicos,
+    tipo_venda:        "recorrente",
+    indicado_por:      p.indicado_por,
+    observacoes:       p.observacoes,
   };
 }
 
@@ -167,7 +171,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
-    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor: String(r.valor), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
+    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
     setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); carregarLogs(r.id);
   }
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); onPreenchimentoUsado?.(); }); }
@@ -202,7 +206,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         vendedor_id:     form.vendedor_id || null,
         cnpj:            form.cnpj.replace(/\D/g, ""),
         cliente:         form.cliente.trim(),
-        valor:           parseFloat(form.valor.replace(",", ".")) || 0,
+        valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
+        valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
         tipo_venda:      form.tipo_venda,
         indicado_por:    form.indicado_por.trim(),
         observacoes:     form.observacoes.trim(),
@@ -243,7 +248,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
     }
   }
 
-  const total = registros.reduce((acc, r) => acc + r.valor, 0);
+  const totalImplantacao = registros.reduce((acc, r) => acc + r.valor_implantacao, 0);
+  const totalMensal      = registros.reduce((acc, r) => acc + r.valor_mensal, 0);
 
   if (view === "form") {
     return (
@@ -314,8 +320,12 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
               <input type="text" value={form.indicado_por} onChange={(e) => set("indicado_por", e.target.value)} placeholder="Nome do indicador" className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Valor (R$)</label>
-              <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set("valor", e.target.value)} placeholder="0,00" className={INPUT} />
+              <label className={LABEL}>Implantação (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.valor_implantacao} onChange={(e) => set("valor_implantacao", e.target.value)} placeholder="0,00" className={INPUT} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Mensal (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.valor_mensal} onChange={(e) => set("valor_mensal", e.target.value)} placeholder="0,00" className={INPUT} />
             </div>
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Serviços</label>
@@ -409,7 +419,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
               {visualizando.cnpj && <div><dt className={LABEL}>CNPJ</dt><dd className="mt-0.5 text-sm text-gray-800">{formatarCNPJ(visualizando.cnpj)}</dd></div>}
               <div><dt className={LABEL}>Fechamento</dt><dd className="mt-0.5 text-sm text-gray-800">{formatData(visualizando.data_fechamento)}</dd></div>
               <div><dt className={LABEL}>Tipo</dt><dd className="mt-0.5"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[visualizando.tipo_venda]}`}>{labelTipoVenda(visualizando.tipo_venda)}</span></dd></div>
-              <div><dt className={LABEL}>Valor</dt><dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatMoeda(visualizando.valor)}</dd></div>
+              {visualizando.valor_implantacao > 0 && <div><dt className={LABEL}>Implantação</dt><dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatMoeda(visualizando.valor_implantacao)}</dd></div>}
+              {visualizando.valor_mensal > 0 && <div><dt className={LABEL}>Mensal</dt><dd className="mt-0.5 text-sm font-semibold text-emerald-700">{formatMoeda(visualizando.valor_mensal)}/mês</dd></div>}
               {visualizando.vendedor_nome && <div><dt className={LABEL}>Vendedor</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.vendedor_nome}</dd></div>}
               {visualizando.indicado_por && <div><dt className={LABEL}>Indicado por</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.indicado_por}</dd></div>}
               {visualizando.servicos?.length > 0 && (
@@ -448,7 +459,11 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} venda${registros.length !== 1 ? "s" : ""}`}</p>
           {registros.length > 0 && (
-            <p className="text-sm font-semibold text-gray-700">Total: <span className="text-folk">{formatMoeda(total)}</span></p>
+            <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
+              {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
+              {totalImplantacao > 0 && totalMensal > 0 && <span className="text-gray-300">·</span>}
+              {totalMensal > 0 && <span>MRR: <span className="text-emerald-600">{formatMoeda(totalMensal)}/mês</span></span>}
+            </div>
           )}
         </div>
         <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
@@ -471,7 +486,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Vendedor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Serviços</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Implantação</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Mensal</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Anexo</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Projetos</th>
@@ -496,7 +512,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       </div>
                     ) : <span className="text-sm text-gray-400">—</span>}
                   </td>
-                  <td className="py-3 pr-4 text-sm font-semibold text-gray-800">{formatMoeda(r.valor)}</td>
+                  <td className="py-3 pr-4 text-sm font-semibold text-gray-800">{r.valor_implantacao > 0 ? formatMoeda(r.valor_implantacao) : <span className="text-gray-400">—</span>}</td>
+                  <td className="py-3 pr-4 text-sm font-semibold text-emerald-700">{r.valor_mensal > 0 ? `${formatMoeda(r.valor_mensal)}/mês` : <span className="text-gray-400 font-normal">—</span>}</td>
                   <td className="py-3 pr-4">
                     <div className="flex flex-col gap-1">
                       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>

@@ -153,7 +153,7 @@ export default function ComercialTVPage() {
 
   // Meta anual: apenas Portaria Remota
   const portaria       = vendas.filter((v) => v.servicos?.includes("Portaria Remota"));
-  const totalReceita   = portaria.reduce((s, v) => s + v.valor, 0);
+  const totalReceita   = portaria.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
   const totalContratos = portaria.length;
   const pct            = Math.min(totalReceita / META_MENSAL, 1);
   const nivel          = getNivel(pct);
@@ -167,7 +167,7 @@ export default function ComercialTVPage() {
     vendas.reduce((acc, v) => {
       const nome = v.vendedor_nome ?? "Sem vendedor";
       if (!acc[nome]) acc[nome] = { nome, total: 0, contratos: 0 };
-      acc[nome].total    += v.valor;
+      acc[nome].total    += v.valor_implantacao + v.valor_mensal;
       acc[nome].contratos += 1;
       return acc;
     }, {} as Record<string, VendedorStats>)
@@ -175,7 +175,7 @@ export default function ComercialTVPage() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  const totalReceitaGeral = vendas.reduce((s, v) => s + v.valor, 0);
+  const totalReceitaGeral = vendas.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
 
   const pipelineAtivos      = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
   const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));

@@ -45,7 +45,8 @@ export interface Venda {
   vendedor_nome: string | null;
   cnpj: string;
   cliente: string;
-  valor: number;
+  valor_implantacao: number;
+  valor_mensal: number;
   indicado_por: string;
   observacoes: string;
   servicos: string[];
@@ -80,7 +81,8 @@ export interface PreenchimentoVenda {
   pipeline_id: string;
   cliente: string;
   vendedor_id: string | null;
-  valor: number;
+  valor_implantacao: number;
+  valor_mensal: number;
   servicos: string[];
   observacoes: string;
   indicado_por: string;
@@ -400,8 +402,11 @@ async function registrarAlteracoesVenda(
     logs.push({ venda_id: vendaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo, autor_nome: autorNome });
   }
 
-  if (antigo.valor !== novo.valor)
-    logs.push({ venda_id: vendaId, campo: "valor", valor_anterior: formatMoeda(antigo.valor), valor_novo: formatMoeda(novo.valor), autor_nome: autorNome });
+  if (antigo.valor_implantacao !== novo.valor_implantacao)
+    logs.push({ venda_id: vendaId, campo: "valor_implantacao", valor_anterior: formatMoeda(antigo.valor_implantacao), valor_novo: formatMoeda(novo.valor_implantacao), autor_nome: autorNome });
+
+  if (antigo.valor_mensal !== novo.valor_mensal)
+    logs.push({ venda_id: vendaId, campo: "valor_mensal", valor_anterior: formatMoeda(antigo.valor_mensal), valor_novo: formatMoeda(novo.valor_mensal), autor_nome: autorNome });
 
   if (antigo.tipo_venda !== novo.tipo_venda)
     logs.push({ venda_id: vendaId, campo: "tipo_venda", valor_anterior: labelTipoVenda(antigo.tipo_venda), valor_novo: labelTipoVenda(novo.tipo_venda), autor_nome: autorNome });

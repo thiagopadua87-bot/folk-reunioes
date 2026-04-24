@@ -11,9 +11,10 @@ CREATE TABLE public.vendas (
   user_id          UUID        NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   data_fechamento  DATE        NOT NULL,
   responsavel      TEXT        NOT NULL DEFAULT '',
-  cliente          TEXT        NOT NULL,
-  valor            NUMERIC     NOT NULL DEFAULT 0,
-  servico          TEXT        NOT NULL DEFAULT '',
+  cliente           TEXT        NOT NULL,
+  valor_implantacao NUMERIC     NOT NULL DEFAULT 0,
+  valor_mensal      NUMERIC     NOT NULL DEFAULT 0,
+  servico           TEXT        NOT NULL DEFAULT '',
   tipo_venda       TEXT        NOT NULL CHECK (tipo_venda IN ('recorrente','venda_direta')),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
