@@ -314,90 +314,97 @@ export default function ComercialTVPage() {
         <div className="grid flex-1 grid-cols-3 grid-rows-2 gap-4 overflow-hidden p-5">
 
           {/* META — col 1-2, row 1 */}
-          <div className={`relative col-span-2 overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 bg-gradient-to-br ${nivel?.gradiente ?? "from-gray-800/20 to-transparent"} p-8 flex flex-col justify-between`}>
+          <div className={`relative col-span-2 overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 bg-gradient-to-br ${nivel?.gradiente ?? "from-gray-800/20 to-transparent"} p-8 flex flex-col gap-6`}>
             <div
               className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-10 blur-3xl"
               style={{ background: nivel?.cor ?? "#6b7280" }}
             />
 
-            <div className="flex items-start justify-between">
-              <div className="fade-up" key={`receita-${totalReceita}`}>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Meta anual — Portaria Remota</p>
-                <p className="mt-2 text-8xl font-black leading-none tracking-tighter text-white">
+            {/* Linha superior: valor realizado + bloco direito */}
+            <div className="flex items-center justify-between gap-8">
+
+              {/* Esquerda — valor principal */}
+              <div className="fade-up min-w-0" key={`receita-${totalReceita}`}>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-600">Meta anual — Portaria Remota</p>
+                <p className="mt-2 text-7xl font-black leading-none tracking-tighter text-white">
                   {formatMoeda(totalReceita)}
                 </p>
-                <p className="mt-3 text-xl text-gray-500">
+                <p className="mt-3 text-sm text-gray-600/70">
                   {proxMeta
-                    ? <>próxima meta: <span className="font-semibold text-gray-400">{formatMoeda(proxMeta)}</span></>
+                    ? <>próxima meta: <span className="font-semibold text-gray-500">{formatMoeda(proxMeta)}</span></>
                     : <span className="font-semibold text-yellow-400">Meta ouro atingida!</span>
                   }
                 </p>
-                <div className="mt-4 flex flex-col gap-1">
+              </div>
+
+              {/* Direita — status + indicadores */}
+              <div className="flex shrink-0 flex-col items-end gap-4 text-right">
+
+                {/* Badge de nível ou contagem regressiva */}
+                {nivel ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className="rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-widest"
+                      style={{ color: nivel.cor, borderColor: `${nivel.cor}40`, background: `${nivel.cor}12` }}
+                    >
+                      {nivel.label}
+                    </span>
+                    <p className="text-4xl font-black text-gray-200">{Math.round(pct * 100)}%</p>
+                    <p className="text-xs text-gray-600/70">{totalContratos} contrato{totalContratos !== 1 ? "s" : ""}</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-600">Faltam para Bronze</p>
+                    <p className="text-4xl font-black text-amber-500/90">
+                      {formatMoeda(META_BRONZE - totalReceita)}
+                    </p>
+                    <p className="text-xs text-gray-600/70">{100 - pctBronze}% para conquistar 🥉</p>
+                    <p className="text-xs text-gray-600/70">{totalContratos} contrato{totalContratos !== 1 ? "s" : ""}</p>
+                  </div>
+                )}
+
+                {/* Indicadores estratégicos */}
+                <div className="flex flex-col items-end gap-1 border-t border-gray-800 pt-3">
                   {valorRestante > 0 ? (
                     <>
-                      <p className="text-2xl font-black text-white">
-                        {formatMoeda(valorRestante)} <span className="text-base font-semibold text-gray-500">restantes p/ ouro</span>
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        <span className="text-lg font-black text-gray-300">{formatMoeda(porMes)}</span>
-                        <span className="ml-1">/mês necessário ({mesesRestantes} {mesesRestantes === 1 ? "mês" : "meses"} restantes)</span>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-600">Restante p/ Ouro</p>
+                      <p className="text-2xl font-black text-white">{formatMoeda(valorRestante)}</p>
+                      <p className="text-xs text-gray-600/70">
+                        <span className="text-sm font-bold text-gray-400">{formatMoeda(porMes)}/mês</span>
+                        {" "}por {mesesRestantes} {mesesRestantes === 1 ? "mês" : "meses"}
                       </p>
                     </>
                   ) : (
-                    <p className="text-xl font-black text-yellow-400">Meta atingida 🎉</p>
+                    <p className="text-lg font-black text-yellow-400">Meta atingida 🎉</p>
                   )}
                 </div>
-              </div>
 
-              <div className="flex flex-col items-end text-right">
-                {nivel ? (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Nível atual</p>
-                    <p
-                      className="mt-1 text-5xl font-black leading-none"
-                      style={{ color: nivel.cor, textShadow: `0 0 30px ${nivel.cor}80` }}
-                    >
-                      {nivel.label}
-                    </p>
-                    <p className="mt-2 text-3xl font-black text-gray-200">{Math.round(pct * 100)}%</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Faltam</p>
-                    <p className="mt-1 text-5xl font-black leading-none text-amber-400">
-                      {formatMoeda(META_BRONZE - totalReceita)}
-                    </p>
-                    <p className="mt-2 text-lg font-bold text-amber-600">para 🥉 BRONZE</p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {100 - pctBronze}% para conquistar o Bronze 🥉
-                    </p>
-                  </>
-                )}
-                <p className="mt-2 text-sm text-gray-500">
-                  {totalContratos} contrato{totalContratos !== 1 ? "s" : ""}
-                </p>
               </div>
             </div>
 
             {/* Barra de progresso */}
             <div>
-              <div className="relative mb-1 flex justify-between text-[10px] text-gray-700">
+              <div className="relative mb-2 flex justify-between text-[10px] text-gray-700">
                 <span>0</span>
-                <span className="absolute -translate-x-1/2" style={{ left: `${(META_BRONZE / META_OURO) * 100}%` }}>Bronze {formatMoeda(META_BRONZE)}</span>
-                <span className="absolute -translate-x-1/2" style={{ left: `${(META_PRATA / META_OURO) * 100}%` }}>Prata {formatMoeda(META_PRATA)}</span>
-                <span>Ouro {formatMoeda(META_OURO)}</span>
+                <span className="absolute -translate-x-1/2" style={{ left: `${(META_BRONZE / META_OURO) * 100}%` }}>
+                  🥉 {formatMoeda(META_BRONZE)}
+                </span>
+                <span className="absolute -translate-x-1/2" style={{ left: `${(META_PRATA / META_OURO) * 100}%` }}>
+                  🥈 {formatMoeda(META_PRATA)}
+                </span>
+                <span>🥇 {formatMoeda(META_OURO)}</span>
               </div>
-              <div className="relative h-7 w-full overflow-hidden rounded-full bg-gray-800">
-                <div className="absolute top-0 h-full w-px bg-gray-700/60" style={{ left: `${(META_BRONZE / META_OURO) * 100}%` }} />
-                <div className="absolute top-0 h-full w-px bg-gray-700/60" style={{ left: `${(META_PRATA / META_OURO) * 100}%` }} />
+              <div className="relative h-8 w-full overflow-hidden rounded-full bg-gray-800">
+                <div className="absolute top-0 h-full w-0.5 bg-gray-700" style={{ left: `${(META_BRONZE / META_OURO) * 100}%` }} />
+                <div className="absolute top-0 h-full w-0.5 bg-gray-700" style={{ left: `${(META_PRATA / META_OURO) * 100}%` }} />
                 <div
                   className="h-full rounded-full transition-all duration-1000 ease-out"
                   style={{
                     width: `${pct * 100}%`,
                     background: nivel
-                      ? `linear-gradient(90deg, ${nivel.cor}99 0%, ${nivel.cor} 100%)`
-                      : "linear-gradient(90deg, #4b556399 0%, #6b7280 100%)",
-                    boxShadow: nivel ? `0 0 24px ${nivel.cor}80, 0 0 48px ${nivel.cor}40` : "none",
+                      ? `linear-gradient(90deg, ${nivel.cor}80 0%, ${nivel.cor} 100%)`
+                      : "linear-gradient(90deg, #4b5563 0%, #6b7280 100%)",
+                    boxShadow: nivel ? `0 0 20px ${nivel.cor}60, 0 0 40px ${nivel.cor}30` : "none",
                   }}
                 />
               </div>
