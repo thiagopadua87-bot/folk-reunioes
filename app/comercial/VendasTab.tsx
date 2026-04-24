@@ -496,82 +496,79 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
       )}
 
       {registros.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <table className="w-full">
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fechamento</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Vendedor</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Serviços</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Implantação</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Mensal</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Anexo</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Projetos</th>
-                <th className="py-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
+                <th className="w-24 py-3 pl-5 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Data</th>
+                <th className="py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
+                <th className="py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Serviços</th>
+                <th className="w-40 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
+                <th className="w-28 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
+                <th className="w-32 py-3 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                <th className="w-28 py-3 pr-5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
             </thead>
             <tbody>
               {registros.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3 pl-6 pr-4 text-sm text-gray-500">{formatData(r.data_fechamento)}</td>
-                  <td className="py-3 pr-4">
-                    <p className="text-sm font-medium text-gray-900">{r.cliente}</p>
-                    {r.cnpj && <p className="text-xs text-gray-400">{formatarCNPJ(r.cnpj)}</p>}
+                  <td className="py-3 pl-5 pr-3 text-xs text-gray-500 whitespace-nowrap">{formatData(r.data_fechamento)}</td>
+                  <td className="py-3 pr-3">
+                    <p className="text-sm font-medium text-gray-900 truncate">{r.cliente}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {r.vendedor_nome || ""}
+                      {r.cnpj && r.vendedor_nome ? " · " : ""}
+                      {r.cnpj ? formatarCNPJ(r.cnpj) : ""}
+                    </p>
                   </td>
-                  <td className="py-3 pr-4 text-sm text-gray-500">{r.vendedor_nome || "—"}</td>
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pr-3">
                     {r.servicos?.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {r.servicos.map((s) => (
                           <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>
                         ))}
                       </div>
-                    ) : <span className="text-sm text-gray-400">—</span>}
+                    ) : <span className="text-xs text-gray-400">—</span>}
                   </td>
-                  <td className="py-3 pr-4 text-sm font-semibold text-gray-800">{r.valor_implantacao > 0 ? formatMoeda(r.valor_implantacao) : <span className="text-gray-400">—</span>}</td>
-                  <td className="py-3 pr-4 text-sm font-semibold text-emerald-700">{r.valor_mensal > 0 ? `${formatMoeda(r.valor_mensal)}/mês` : <span className="text-gray-400 font-normal">—</span>}</td>
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pr-3">
+                    {r.valor_implantacao > 0 && <p className="text-sm font-semibold text-gray-800">{formatMoeda(r.valor_implantacao)}</p>}
+                    {r.valor_mensal > 0 && <p className="text-xs font-semibold text-emerald-600">{formatMoeda(r.valor_mensal)}/mês</p>}
+                    {!r.valor_implantacao && !r.valor_mensal && <span className="text-xs text-gray-400">—</span>}
+                  </td>
+                  <td className="py-3 pr-3">
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
+                      {labelTipoVenda(r.tipo_venda)}
+                    </span>
+                    {r.pipeline_id && <p className="mt-0.5 text-[10px] font-semibold text-folk/70">via Pipeline</p>}
+                  </td>
+                  <td className="py-3 pr-3">
                     <div className="flex flex-col gap-1">
-                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
-                        {labelTipoVenda(r.tipo_venda)}
-                      </span>
-                      {r.pipeline_id && (
-                        <span className="text-[10px] font-semibold text-folk/70">via Pipeline</span>
+                      {r.enviado_para_projetos ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">✓ Projetos</span>
+                      ) : (
+                        <button
+                          onClick={() => handleEnviarParaProjetos(r)}
+                          disabled={enviando === r.id}
+                          className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 disabled:opacity-50"
+                        >
+                          {enviando === r.id ? "..." : "→ Projetos"}
+                        </button>
+                      )}
+                      {r.arquivo_url && (
+                        <a href={r.arquivo_url} target="_blank" rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-folk"
+                          title={r.arquivo_nome ?? ""}>
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                          Anexo
+                        </a>
                       )}
                     </div>
                   </td>
-                  <td className="py-3 pr-4">
-                    {r.arquivo_url ? (
-                      <a href={r.arquivo_url} target="_blank" rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
-                        title={r.arquivo_nome ?? ""}>
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
-                        Baixar
-                      </a>
-                    ) : <span className="text-sm text-gray-400">—</span>}
-                  </td>
-                  <td className="py-3 pr-4">
-                    {r.enviado_para_projetos ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                        ✓ Enviado
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleEnviarParaProjetos(r)}
-                        disabled={enviando === r.id}
-                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {enviando === r.id ? "Enviando..." : "→ Projetos"}
-                      </button>
-                    )}
-                  </td>
-                  <td className="py-3 pr-6">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
-                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2.5 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
-                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+                  <td className="py-3 pr-5">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
+                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
+                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
                         {excluindo === r.id ? "..." : "Excluir"}
                       </button>
                     </div>
