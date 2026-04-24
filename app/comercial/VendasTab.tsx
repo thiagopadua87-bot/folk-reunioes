@@ -3,12 +3,41 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido, registrarOrigemVenda,
+  listarLogsVenda,
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
-  type Venda, type VendaPayload, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
+  type Venda, type VendaPayload, type VendaLog, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+
+const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
+  data_fechamento:  { label: "Data de fechamento", dot: "bg-blue-400" },
+  cliente:          { label: "Cliente",            dot: "bg-gray-500" },
+  cnpj:             { label: "CNPJ",               dot: "bg-gray-400" },
+  vendedor:         { label: "Vendedor",            dot: "bg-blue-400" },
+  valor:            { label: "Valor",               dot: "bg-green-500" },
+  tipo_venda:       { label: "Tipo de venda",       dot: "bg-purple-400" },
+  indicado_por:     { label: "Indicado por",        dot: "bg-amber-400" },
+  observacoes:      { label: "Observações",         dot: "bg-amber-300" },
+  servico_adicionado: { label: "Serviço adicionado", dot: "bg-folk" },
+  servico_removido:   { label: "Serviço removido",   dot: "bg-red-400" },
+  arquivo:          { label: "Anexo",               dot: "bg-gray-400" },
+};
+
+function formatLogTs(s: string): string {
+  const d = new Date(s);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " +
+         d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatLogMsg(log: VendaLog): string {
+  switch (log.campo) {
+    case "servico_adicionado": return log.valor_novo;
+    case "servico_removido":   return log.valor_anterior;
+    default: return `${log.valor_anterior} → ${log.valor_novo}`;
+  }
+}
 
 const TIPO_BADGE: Record<TipoVenda, string> = {
   recorrente:   "bg-folk/10 text-folk border-folk/20",
@@ -106,6 +135,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [erroCNPJ, setErroCNPJ]         = useState<string | null>(null);
   const [arquivo, setArquivo]           = useState<File | null>(null);
+  const [logs, setLogs]                 = useState<VendaLog[]>([]);
+  const [carregandoLogs, setCarregandoLogs] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
@@ -125,13 +156,20 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); }
+  async function carregarLogs(id: string) {
+    setCarregandoLogs(true);
+    try { setLogs(await listarLogsVenda(id)); }
+    catch { setLogs([]); }
+    finally { setCarregandoLogs(false); }
+  }
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
     setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor: String(r.valor), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
-    setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form");
+    setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); carregarLogs(r.id);
   }
-  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); onPreenchimentoUsado?.(); }); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); onPreenchimentoUsado?.(); }); }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function buscarRazaoSocial(cnpjMascarado: string) {
@@ -168,7 +206,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
         pipeline_id:     preenchimento?.pipeline_id ?? (editando?.pipeline_id ?? null),
       };
       if (editando) {
-        await editarVenda(editando.id, payload, form.servicos, arquivo);
+        await editarVenda(editando.id, payload, form.servicos, arquivo, editando, vendedores);
       } else {
         const vendaId = await criarVenda(payload, form.servicos, arquivo);
         if (preenchimento?.pipeline_id) {
@@ -317,6 +355,39 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
             </div>
           </form>
         </Card>
+
+        {editando && (
+          <Card className="p-6">
+            <h3 className="mb-4 text-sm font-semibold text-gray-800">Histórico de alterações</h3>
+            {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
+            {!carregandoLogs && logs.length === 0 && (
+              <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
+            )}
+            {!carregandoLogs && logs.length > 0 && (
+              <div>
+                {logs.map((log, i) => {
+                  const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
+                  return (
+                    <div key={log.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                        {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
+                      </div>
+                      <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
+                        <p className="text-[11px] text-gray-400 mb-0.5">
+                          {formatLogTs(log.created_at)}
+                          {log.autor_nome && <span className="ml-1">· {log.autor_nome}</span>}
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
+                        <p className="text-sm text-gray-700">{formatLogMsg(log)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        )}
       </div>
     );
   }

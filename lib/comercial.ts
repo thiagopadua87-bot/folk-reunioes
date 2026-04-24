@@ -222,7 +222,14 @@ export async function marcarPipelineConvertido(pipelineId: string, vendaId: stri
   ]);
 }
 
-export async function editarVenda(id: string, payload: VendaPayload, servicos: string[], arquivo?: File | null): Promise<void> {
+export async function editarVenda(
+  id: string,
+  payload: VendaPayload,
+  servicos: string[],
+  arquivo?: File | null,
+  dadosAntigos?: Venda,
+  vendedores?: Vendedor[],
+): Promise<void> {
   let arquivoExtra: { arquivo_url?: string; arquivo_nome?: string } = {};
   if (arquivo) {
     const { url, nome } = await uploadAnexo(id, arquivo);
@@ -240,6 +247,10 @@ export async function editarVenda(id: string, payload: VendaPayload, servicos: s
       .from("venda_servicos")
       .insert(servicos.map((s) => ({ venda_id: id, servico: s })));
     if (errIns) throw new Error(errIns.message);
+  }
+
+  if (dadosAntigos && vendedores) {
+    registrarAlteracoesVenda(id, dadosAntigos, payload, servicos, vendedores, arquivo?.name ?? null).catch(() => {});
   }
 }
 
@@ -345,6 +356,74 @@ async function getAutorNome(): Promise<string | null> {
   return (data as { nome: string } | null)?.nome ?? null;
 }
 
+export async function listarLogsVenda(vendaId: string): Promise<VendaLog[]> {
+  const { data, error } = await supabase
+    .from("vendas_logs")
+    .select("*")
+    .eq("venda_id", vendaId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as VendaLog[];
+}
+
+async function registrarAlteracoesVenda(
+  vendaId: string,
+  antigo: Venda,
+  novo: VendaPayload,
+  novosServicos: string[],
+  vendedores: Vendedor[],
+  novoArquivoNome?: string | null,
+): Promise<void> {
+  type LogInput = { venda_id: string; campo: string; valor_anterior: string; valor_novo: string; autor_nome: string | null };
+  const autorNome = await getAutorNome();
+  const logs: LogInput[] = [];
+
+  const cnpjFmt = (v: string) => {
+    const d = v.replace(/\D/g, "");
+    if (d.length !== 14) return v || "—";
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  };
+
+  if (antigo.data_fechamento !== novo.data_fechamento)
+    logs.push({ venda_id: vendaId, campo: "data_fechamento", valor_anterior: formatData(antigo.data_fechamento), valor_novo: formatData(novo.data_fechamento), autor_nome: autorNome });
+
+  if (antigo.cliente !== novo.cliente)
+    logs.push({ venda_id: vendaId, campo: "cliente", valor_anterior: antigo.cliente, valor_novo: novo.cliente, autor_nome: autorNome });
+
+  if ((antigo.cnpj ?? "") !== (novo.cnpj ?? ""))
+    logs.push({ venda_id: vendaId, campo: "cnpj", valor_anterior: cnpjFmt(antigo.cnpj), valor_novo: cnpjFmt(novo.cnpj), autor_nome: autorNome });
+
+  if (antigo.vendedor_id !== novo.vendedor_id) {
+    const nomeAntigo = antigo.vendedor_nome ?? "—";
+    const nomeNovo   = vendedores.find((v) => v.id === novo.vendedor_id)?.nome ?? "—";
+    logs.push({ venda_id: vendaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo, autor_nome: autorNome });
+  }
+
+  if (antigo.valor !== novo.valor)
+    logs.push({ venda_id: vendaId, campo: "valor", valor_anterior: formatMoeda(antigo.valor), valor_novo: formatMoeda(novo.valor), autor_nome: autorNome });
+
+  if (antigo.tipo_venda !== novo.tipo_venda)
+    logs.push({ venda_id: vendaId, campo: "tipo_venda", valor_anterior: labelTipoVenda(antigo.tipo_venda), valor_novo: labelTipoVenda(novo.tipo_venda), autor_nome: autorNome });
+
+  if ((antigo.indicado_por ?? "") !== (novo.indicado_por ?? ""))
+    logs.push({ venda_id: vendaId, campo: "indicado_por", valor_anterior: antigo.indicado_por || "—", valor_novo: novo.indicado_por || "—", autor_nome: autorNome });
+
+  if ((antigo.observacoes ?? "") !== (novo.observacoes ?? ""))
+    logs.push({ venda_id: vendaId, campo: "observacoes", valor_anterior: antigo.observacoes || "—", valor_novo: novo.observacoes || "—", autor_nome: autorNome });
+
+  const antigosServicos = antigo.servicos ?? [];
+  for (const s of novosServicos.filter((s) => !antigosServicos.includes(s)))
+    logs.push({ venda_id: vendaId, campo: "servico_adicionado", valor_anterior: "", valor_novo: s, autor_nome: autorNome });
+  for (const s of antigosServicos.filter((s) => !novosServicos.includes(s)))
+    logs.push({ venda_id: vendaId, campo: "servico_removido", valor_anterior: s, valor_novo: "", autor_nome: autorNome });
+
+  if (novoArquivoNome)
+    logs.push({ venda_id: vendaId, campo: "arquivo", valor_anterior: antigo.arquivo_nome || "—", valor_novo: novoArquivoNome, autor_nome: autorNome });
+
+  if (logs.length === 0) return;
+  await supabase.from("vendas_logs").insert(logs);
+}
+
 export async function registrarOrigemVenda(vendaId: string, pipelineId: string): Promise<void> {
   const autorNome = await getAutorNome();
   await supabase.from("vendas_logs").insert({
@@ -402,6 +481,18 @@ async function registrarAlteracoes(
   for (const s of antigosServicos.filter((s) => !novosServicos.includes(s))) {
     logs.push({ proposta_id: propostaId, campo: "servico_removido", valor_anterior: s, valor_novo: "", autor_nome: autorNome });
   }
+
+  if (antigo.data_inicio_lead !== novo.data_inicio_lead)
+    logs.push({ proposta_id: propostaId, campo: "data_lead", valor_anterior: formatData(antigo.data_inicio_lead), valor_novo: formatData(novo.data_inicio_lead), autor_nome: autorNome });
+
+  if (antigo.cliente !== novo.cliente)
+    logs.push({ proposta_id: propostaId, campo: "cliente", valor_anterior: antigo.cliente, valor_novo: novo.cliente, autor_nome: autorNome });
+
+  if ((antigo.indicado_por ?? "") !== (novo.indicado_por ?? ""))
+    logs.push({ proposta_id: propostaId, campo: "indicado_por", valor_anterior: antigo.indicado_por || "—", valor_novo: novo.indicado_por || "—", autor_nome: autorNome });
+
+  if ((antigo.observacoes ?? "") !== (novo.observacoes ?? ""))
+    logs.push({ proposta_id: propostaId, campo: "observacoes", valor_anterior: antigo.observacoes || "—", valor_novo: novo.observacoes || "—", autor_nome: autorNome });
 
   if (antigo.convertido_em_venda && logs.length > 0) {
     logs.push({

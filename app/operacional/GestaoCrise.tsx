@@ -3,12 +3,28 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   listarCrises, criarCrise, editarCrise, excluirCrise,
+  listarLogsCrise,
   TIPOS_SERVICO, NIVEIS_RISCO,
   labelTipoServico, labelNivelRisco,
-  type CriseItem, type TipoServico, type NivelRisco,
+  type CriseItem, type CriseLog, type TipoServico, type NivelRisco,
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+
+// ── Log helpers ─────────────────────────────────────────────
+
+const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
+  cliente:      { label: "Cliente",        dot: "bg-gray-500" },
+  tipo_servico: { label: "Tipo de serviço", dot: "bg-folk" },
+  risco:        { label: "Nível de risco",  dot: "bg-amber-400" },
+  acoes:        { label: "Ações",           dot: "bg-blue-400" },
+};
+
+function formatLogTs(s: string): string {
+  const d = new Date(s);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " +
+         d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
 
 // ── Estilos de risco ─────────────────────────────────────────
 
@@ -57,6 +73,8 @@ export default function GestaoCrise() {
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [filtroRisco, setFiltroRisco] = useState<NivelRisco | "">("");
+  const [logs, setLogs]           = useState<CriseLog[]>([]);
+  const [carregandoLogs, setCarregandoLogs] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -75,17 +93,24 @@ export default function GestaoCrise() {
 
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
+  async function carregarLogs(id: string) {
+    setCarregandoLogs(true);
+    try { setLogs(await listarLogsCrise(id)); }
+    catch { setLogs([]); }
+    finally { setCarregandoLogs(false); }
+  }
+
   function abrirFormNovo() {
-    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form");
   }
 
   function abrirFormEditar(c: CriseItem) {
     setEditando(c);
     setForm({ cliente: c.cliente, tipo_servico: c.tipo_servico, risco: c.risco, acoes: c.acoes });
-    setErroForm(null); markClean(); setView("form");
+    setErroForm(null); markClean(); setView("form"); carregarLogs(c.id);
   }
 
-  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((prev) => ({ ...prev, [k]: v })); markDirty();
@@ -101,7 +126,7 @@ export default function GestaoCrise() {
     setErroForm(null);
     try {
       const payload = { cliente: form.cliente.trim(), tipo_servico: form.tipo_servico, risco: form.risco, acoes: form.acoes.trim() };
-      if (editando) await editarCrise(editando.id, payload);
+      if (editando) await editarCrise(editando.id, payload, editando);
       else           await criarCrise(payload);
       markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
@@ -187,6 +212,39 @@ export default function GestaoCrise() {
             </div>
           </form>
         </Card>
+
+        {editando && (
+          <Card className="p-6">
+            <h3 className="mb-4 text-sm font-semibold text-gray-800">Histórico de alterações</h3>
+            {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
+            {!carregandoLogs && logs.length === 0 && (
+              <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
+            )}
+            {!carregandoLogs && logs.length > 0 && (
+              <div>
+                {logs.map((log, i) => {
+                  const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
+                  return (
+                    <div key={log.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                        {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
+                      </div>
+                      <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
+                        <p className="text-[11px] text-gray-400 mb-0.5">
+                          {formatLogTs(log.created_at)}
+                          {log.autor_nome && <span className="ml-1">· {log.autor_nome}</span>}
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
+                        <p className="text-sm text-gray-700">{log.valor_anterior} → {log.valor_novo}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        )}
       </div>
     );
   }
