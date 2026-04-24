@@ -330,9 +330,9 @@ export default function ComercialTVPage() {
               </div>
 
               <div className="flex flex-col items-end text-right">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Nível atual</p>
                 {nivel ? (
                   <>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Nível atual</p>
                     <p
                       className="mt-1 text-5xl font-black leading-none"
                       style={{ color: nivel.cor, textShadow: `0 0 30px ${nivel.cor}80` }}
@@ -342,9 +342,18 @@ export default function ComercialTVPage() {
                     <p className="mt-2 text-3xl font-black text-gray-200">{Math.round(pct * 100)}%</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-2xl font-bold text-gray-600">Sem meta</p>
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Faltam</p>
+                    <p className="mt-1 text-5xl font-black leading-none text-amber-400">
+                      {formatMoeda(META_BRONZE - totalReceita)}
+                    </p>
+                    <p className="mt-2 text-lg font-bold text-amber-600">para 🥉 BRONZE</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Você está a {Math.round((totalReceita / META_BRONZE) * 100)}% da primeira meta!
+                    </p>
+                  </>
                 )}
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-gray-500">
                   {totalContratos} contrato{totalContratos !== 1 ? "s" : ""}
                 </p>
               </div>
