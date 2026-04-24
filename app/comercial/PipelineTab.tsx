@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   listarPipeline, criarPipelineItem, editarPipelineItem, excluirPipelineItem,
   listarLogs,
@@ -156,18 +156,25 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     });
   }, [logs]);
 
+  const reqIdRef = useRef(0);
+
   const carregar = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
       const [lista, vends] = await Promise.all([
         listarPipeline({ temperatura: filtros.temperatura || undefined, status: filtros.status || undefined }),
         listarVendedores({ ativo: true }),
       ]);
+      if (reqId !== reqIdRef.current) return;
       setRegistros(lista);
       setVendedores(vends);
     } catch (e) {
+      if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
-    } finally { setCarregando(false); }
+    } finally {
+      if (reqId === reqIdRef.current) setCarregando(false);
+    }
   }, [filtros]);
 
   useEffect(() => { carregar(); }, [carregar]);

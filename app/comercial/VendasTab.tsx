@@ -146,28 +146,25 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [logs, setLogs]                 = useState<VendaLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const reqIdRef = useRef(0);
 
   const carregar = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
+    const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
       const [pagina_dados, vends] = await Promise.all([
-        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, pagina, porPagina }, controller.signal),
+        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, pagina, porPagina }),
         listarVendedores({ ativo: true }),
       ]);
-      if (controller.signal.aborted) return;
+      if (reqId !== reqIdRef.current) return;
       setRegistros(pagina_dados.registros);
       setTotal(pagina_dados.total);
       setVendedores(vends);
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally {
-      if (!controller.signal.aborted) setCarregando(false);
+      if (reqId === reqIdRef.current) setCarregando(false);
     }
   }, [filtros, pagina, porPagina]);
 
