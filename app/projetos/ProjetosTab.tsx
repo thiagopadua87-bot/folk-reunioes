@@ -17,8 +17,9 @@ const SITUACAO_BADGE: Record<SituacaoProjeto, string> = {
 };
 
 const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  situacao: { label: "Situação", dot: "bg-folk" },
-  valor:    { label: "Valor",    dot: "bg-green-500" },
+  situacao:    { label: "Situação",    dot: "bg-folk" },
+  valor:       { label: "Valor",       dot: "bg-green-500" },
+  observacoes: { label: "Observações", dot: "bg-amber-400" },
 };
 
 function formatLogTs(s: string): string {
@@ -52,9 +53,10 @@ interface FormState {
   servicos: string[];
   situacao: SituacaoProjeto;
   valor: string;
+  observacoes: string;
 }
 
-const FORM_VAZIO: FormState = { data_inicio: "", cliente: "", servicos: [], situacao: "em_execucao", valor: "" };
+const FORM_VAZIO: FormState = { data_inicio: "", cliente: "", servicos: [], situacao: "em_execucao", valor: "", observacoes: "" };
 
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
@@ -92,7 +94,7 @@ export default function ProjetosTab() {
   function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); setView("form"); }
   function abrirEditar(r: Projeto) {
     setEditando(r);
-    setForm({ data_inicio: r.data_inicio, cliente: r.cliente, servicos: r.servicos ?? [], situacao: r.situacao, valor: String(r.valor) });
+    setForm({ data_inicio: r.data_inicio, cliente: r.cliente, servicos: r.servicos ?? [], situacao: r.situacao, valor: String(r.valor), observacoes: r.observacoes ?? "" });
     setErroForm(null); setView("form"); carregarLogs(r.id);
   }
   function cancelar() { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }
@@ -103,7 +105,7 @@ export default function ProjetosTab() {
     if (!form.data_inicio || !form.cliente) { setErroForm("Preencha todos os campos obrigatórios."); return; }
     setSalvando(true); setErroForm(null);
     try {
-      const payload = { data_inicio: form.data_inicio, cliente: form.cliente.trim(), servicos: form.servicos, situacao: form.situacao, valor: parseFloat(form.valor.replace(",", ".")) || 0 };
+      const payload = { data_inicio: form.data_inicio, cliente: form.cliente.trim(), servicos: form.servicos, situacao: form.situacao, valor: parseFloat(form.valor.replace(",", ".")) || 0, observacoes: form.observacoes.trim() };
       const idEditado = editando?.id ?? null;
       if (editando) await editarProjeto(editando.id, payload, editando);
       else           await criarProjeto(payload);
@@ -157,6 +159,9 @@ export default function ProjetosTab() {
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Serviços</label>
               <CheckboxServicos value={form.servicos} onChange={(v) => set("servicos", v)} />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <textarea rows={3} value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder="Anotações internas sobre o projeto..." className={`${INPUT} resize-none`} />
             </div>
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
             <div className="flex gap-3 sm:col-span-2">

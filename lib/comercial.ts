@@ -30,6 +30,7 @@ export const SERVICOS_COMERCIAL = [
   "Monitoramento de Alarme",
   "Controle de Acesso",
   "Retrofit",
+  "Aditivo de contrato",
 ] as const;
 
 export type TipoVenda      = (typeof TIPOS_VENDA)[number]["value"];

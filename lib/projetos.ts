@@ -42,6 +42,7 @@ export interface Projeto {
   servicos: string[];
   situacao: SituacaoProjeto;
   valor: number;
+  observacoes: string;
   created_at: string;
 }
 
@@ -176,6 +177,9 @@ async function registrarAlteracoesProjeto(
 
   if (antigo.valor !== novo.valor)
     logs.push({ projeto_id: projetoId, campo: "valor", valor_anterior: formatMoeda(antigo.valor), valor_novo: formatMoeda(novo.valor) });
+
+  if ((antigo.observacoes ?? "") !== (novo.observacoes ?? ""))
+    logs.push({ projeto_id: projetoId, campo: "observacoes", valor_anterior: antigo.observacoes || "—", valor_novo: novo.observacoes || "—" });
 
   if (logs.length === 0) return;
   await supabase.from("projeto_logs").insert(logs);
