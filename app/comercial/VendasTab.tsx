@@ -98,8 +98,9 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [form, setForm] = useState<FormState>(preenchimento ? formDePreenchimento(preenchimento) : FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
-  const [excluindo, setExcluindo] = useState<string | null>(null);
-  const [enviando, setEnviando]   = useState<string | null>(null);
+  const [excluindo, setExcluindo]     = useState<string | null>(null);
+  const [enviando, setEnviando]       = useState<string | null>(null);
+  const [visualizando, setVisualizando] = useState<Venda | null>(null);
   const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "" });
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [erroCNPJ, setErroCNPJ]         = useState<string | null>(null);
@@ -319,6 +320,33 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
   return (
     <div>
+      {visualizando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setVisualizando(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">Detalhes da venda</h3>
+              <button onClick={() => setVisualizando(null)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">✕</button>
+            </div>
+            <dl className="flex flex-col gap-3">
+              <div><dt className={LABEL}>Cliente</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.cliente}</dd></div>
+              {visualizando.cnpj && <div><dt className={LABEL}>CNPJ</dt><dd className="mt-0.5 text-sm text-gray-800">{formatarCNPJ(visualizando.cnpj)}</dd></div>}
+              <div><dt className={LABEL}>Fechamento</dt><dd className="mt-0.5 text-sm text-gray-800">{formatData(visualizando.data_fechamento)}</dd></div>
+              <div><dt className={LABEL}>Tipo</dt><dd className="mt-0.5"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[visualizando.tipo_venda]}`}>{labelTipoVenda(visualizando.tipo_venda)}</span></dd></div>
+              <div><dt className={LABEL}>Valor</dt><dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatMoeda(visualizando.valor)}</dd></div>
+              {visualizando.vendedor_nome && <div><dt className={LABEL}>Vendedor</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.vendedor_nome}</dd></div>}
+              {visualizando.indicado_por && <div><dt className={LABEL}>Indicado por</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.indicado_por}</dd></div>}
+              {visualizando.servicos?.length > 0 && (
+                <div><dt className={LABEL}>Serviços</dt><dd className="mt-1 flex flex-wrap gap-1">{visualizando.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}</dd></div>
+              )}
+              {visualizando.observacoes && <div><dt className={LABEL}>Observações</dt><dd className="mt-0.5 text-sm text-gray-700 whitespace-pre-wrap">{visualizando.observacoes}</dd></div>}
+              {visualizando.arquivo_url && (
+                <div><dt className={LABEL}>Anexo</dt><dd className="mt-0.5"><a href={visualizando.arquivo_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-folk hover:underline">{visualizando.arquivo_nome || "Baixar arquivo"}</a></dd></div>
+              )}
+            </dl>
+          </div>
+        </div>
+      )}
+
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
@@ -376,13 +404,13 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
             <tbody>
               {registros.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3.5 pl-6 pr-4 text-sm text-gray-500">{formatData(r.data_fechamento)}</td>
-                  <td className="py-3.5 pr-4">
+                  <td className="py-3 pl-6 pr-4 text-sm text-gray-500">{formatData(r.data_fechamento)}</td>
+                  <td className="py-3 pr-4">
                     <p className="text-sm font-medium text-gray-900">{r.cliente}</p>
                     {r.cnpj && <p className="text-xs text-gray-400">{formatarCNPJ(r.cnpj)}</p>}
                   </td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.vendedor_nome || "—"}</td>
-                  <td className="py-3.5 pr-4">
+                  <td className="py-3 pr-4 text-sm text-gray-500">{r.vendedor_nome || "—"}</td>
+                  <td className="py-3 pr-4">
                     {r.servicos?.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {r.servicos.map((s) => (
@@ -391,8 +419,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       </div>
                     ) : <span className="text-sm text-gray-400">—</span>}
                   </td>
-                  <td className="py-3.5 pr-4 text-sm font-semibold text-gray-800">{formatMoeda(r.valor)}</td>
-                  <td className="py-3.5 pr-4">
+                  <td className="py-3 pr-4 text-sm font-semibold text-gray-800">{formatMoeda(r.valor)}</td>
+                  <td className="py-3 pr-4">
                     <div className="flex flex-col gap-1">
                       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TIPO_BADGE[r.tipo_venda]}`}>
                         {labelTipoVenda(r.tipo_venda)}
@@ -402,7 +430,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       )}
                     </div>
                   </td>
-                  <td className="py-3.5 pr-4">
+                  <td className="py-3 pr-4">
                     {r.arquivo_url ? (
                       <a href={r.arquivo_url} target="_blank" rel="noreferrer"
                         className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
@@ -412,7 +440,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       </a>
                     ) : <span className="text-sm text-gray-400">—</span>}
                   </td>
-                  <td className="py-3.5 pr-4">
+                  <td className="py-3 pr-4">
                     {r.enviado_para_projetos ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
                         ✓ Enviado
@@ -421,16 +449,17 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                       <button
                         onClick={() => handleEnviarParaProjetos(r)}
                         disabled={enviando === r.id}
-                        className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
+                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 disabled:opacity-50 whitespace-nowrap"
                       >
                         {enviando === r.id ? "Enviando..." : "→ Projetos"}
                       </button>
                     )}
                   </td>
-                  <td className="py-3.5 pr-6">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+                  <td className="py-3 pr-6">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
+                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2.5 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
+                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
                         {excluindo === r.id ? "..." : "Excluir"}
                       </button>
                     </div>
