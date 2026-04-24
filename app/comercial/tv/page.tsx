@@ -425,7 +425,7 @@ export default function ComercialTVPage() {
                     textShadow: novaVendaAtiva ? "0 0 30px #ffd70080" : "0 0 20px #10b98180",
                   }}
                 >
-                  {formatMoeda(ultimaVendaDestaque.valor)}
+                  {formatMoeda(ultimaVendaDestaque.valor_implantacao + ultimaVendaDestaque.valor_mensal)}
                 </p>
                 {ultimaVendaDestaque.vendedor_nome && (
                   <p className="mt-4 text-sm text-gray-500">
