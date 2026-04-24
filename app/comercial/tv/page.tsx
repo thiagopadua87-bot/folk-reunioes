@@ -168,6 +168,10 @@ export default function ComercialTVPage() {
                    : totalReceita < META_PRATA  ? META_PRATA
                    : totalReceita < META_OURO   ? META_OURO
                    : null;
+  const mesAtual       = new Date().getMonth(); // 0-11
+  const mesesRestantes = Math.max(12 - mesAtual, 1);
+  const valorRestante  = Math.max(META_OURO - totalReceita, 0);
+  const porMes         = valorRestante > 0 ? Math.ceil(valorRestante / mesesRestantes) : 0;
 
   // Última venda e ranking: todos os serviços
   const ultimaVendaGeral = [...vendas].sort(
@@ -328,6 +332,21 @@ export default function ComercialTVPage() {
                     : <span className="font-semibold text-yellow-400">Meta ouro atingida!</span>
                   }
                 </p>
+                <div className="mt-4 flex flex-col gap-1">
+                  {valorRestante > 0 ? (
+                    <>
+                      <p className="text-2xl font-black text-white">
+                        {formatMoeda(valorRestante)} <span className="text-base font-semibold text-gray-500">restantes p/ ouro</span>
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        <span className="text-lg font-black text-gray-300">{formatMoeda(porMes)}</span>
+                        <span className="ml-1">/mês necessário ({mesesRestantes} {mesesRestantes === 1 ? "mês" : "meses"} restantes)</span>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xl font-black text-yellow-400">Meta atingida 🎉</p>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col items-end text-right">
