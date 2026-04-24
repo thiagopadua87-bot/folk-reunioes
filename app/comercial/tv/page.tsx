@@ -182,7 +182,7 @@ export default function ComercialTVPage() {
     vendas.reduce((acc, v) => {
       const nome = v.vendedor_nome ?? "Sem vendedor";
       if (!acc[nome]) acc[nome] = { nome, total: 0, contratos: 0 };
-      acc[nome].total    += v.valor_implantacao + v.valor_mensal;
+      acc[nome].total    += v.valor_mensal;
       acc[nome].contratos += 1;
       return acc;
     }, {} as Record<string, VendedorStats>)
@@ -190,7 +190,9 @@ export default function ComercialTVPage() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  const totalReceitaGeral = vendas.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
+  const totalReceitaGeral     = vendas.reduce((s, v) => s + v.valor_mensal, 0);
+  const totalEquipServicos    = vendas.reduce((s, v) => s + v.valor_implantacao, 0);
+  const qtdEquipServicos      = vendas.filter((v) => v.valor_implantacao > 0).length;
 
   const pipelineAtivos      = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
   const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
@@ -411,43 +413,57 @@ export default function ComercialTVPage() {
             </div>
           </div>
 
-          {/* RANKING — col 3, row 1 */}
-          <div className="rounded-3xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
-            <p className="shrink-0 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Ranking — todos os serviços</p>
+          {/* RANKING + EQUIPAMENTOS — col 3, row 1 */}
+          <div className="flex flex-col gap-4">
 
-            {ranking.length === 0 ? (
-              <p className="text-sm text-gray-600">Nenhuma venda registrada.</p>
-            ) : (
-              <div className="flex flex-1 flex-col justify-around gap-2">
-                {ranking.map((v, i) => {
-                  const MEDALHAS = ["🥇", "🥈", "🥉"];
-                  const CORES    = ["#ffd700", "#c0c0c0", "#cd7f32", "#94a3b8", "#94a3b8"];
-                  const pctBar   = totalReceitaGeral > 0 ? v.total / totalReceitaGeral : 0;
-                  return (
-                    <div key={v.nome} className="flex items-center gap-3">
-                      <span className="w-8 shrink-0 text-center text-xl">
-                        {MEDALHAS[i] ?? <span className="text-sm text-gray-500">{i + 1}</span>}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <p className="truncate text-sm font-bold text-white">{v.nome}</p>
-                          <p className="shrink-0 text-xs font-semibold text-gray-400">{formatMoeda(v.total)}</p>
+            {/* Ranking */}
+            <div className="flex-1 rounded-3xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
+              <p className="shrink-0 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Ranking — valor mensal</p>
+
+              {ranking.length === 0 ? (
+                <p className="text-sm text-gray-600">Nenhuma venda registrada.</p>
+              ) : (
+                <div className="flex flex-1 flex-col justify-around gap-2">
+                  {ranking.map((v, i) => {
+                    const MEDALHAS = ["🥇", "🥈", "🥉"];
+                    const CORES    = ["#ffd700", "#c0c0c0", "#cd7f32", "#94a3b8", "#94a3b8"];
+                    const pctBar   = totalReceitaGeral > 0 ? v.total / totalReceitaGeral : 0;
+                    return (
+                      <div key={v.nome} className="flex items-center gap-3">
+                        <span className="w-8 shrink-0 text-center text-xl">
+                          {MEDALHAS[i] ?? <span className="text-sm text-gray-500">{i + 1}</span>}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <p className="truncate text-sm font-bold text-white">{v.nome}</p>
+                            <p className="shrink-0 text-xs font-semibold text-gray-400">{formatMoeda(v.total)}</p>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
+                            <div
+                              className="h-full rounded-full transition-all duration-1000"
+                              style={{ width: `${pctBar * 100}%`, background: CORES[i] }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-gray-600">
+                            {v.contratos} contrato{v.contratos !== 1 ? "s" : ""}
+                          </p>
                         </div>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000"
-                            style={{ width: `${pctBar * 100}%`, background: CORES[i] }}
-                          />
-                        </div>
-                        <p className="mt-0.5 text-[10px] text-gray-600">
-                          {v.contratos} contrato{v.contratos !== 1 ? "s" : ""}
-                        </p>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Vendas de Equipamentos e Serviços */}
+            <div className="rounded-3xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Vendas de Equipamentos e Serviços</p>
+              <p className="text-3xl font-black text-white">{formatMoeda(totalEquipServicos)}</p>
+              <p className="text-xs text-gray-600">
+                {qtdEquipServicos} contrato{qtdEquipServicos !== 1 ? "s" : ""} com implantação no ano
+              </p>
+            </div>
+
           </div>
 
           {/* ÚLTIMA VENDA — col 1, row 2 */}
