@@ -350,7 +350,7 @@ export default function ComercialTVPage() {
                     </p>
                     <p className="mt-2 text-lg font-bold text-amber-600">para 🥉 BRONZE</p>
                     <p className="mt-1 text-sm text-gray-500">
-                      Você está a {pctBronze}% da primeira meta!
+                      {100 - pctBronze}% para conquistar o Bronze 🥉
                     </p>
                   </>
                 )}
