@@ -149,11 +149,16 @@ export async function listarVendas(filtros?: FiltrosVendas): Promise<Venda[]> {
   if (filtros?.tipoVenda)  q = q.eq("tipo_venda", filtros.tipoVenda);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  return (data as RawVenda[] ?? []).map(({ venda_servicos, vendedores, ...v }) => ({
-    ...v,
-    servicos:      venda_servicos.map((vs) => vs.servico),
-    vendedor_nome: vendedores?.nome ?? null,
-  }));
+  return (data as RawVenda[] ?? []).map(({ venda_servicos, vendedores, ...v }) => {
+    const row = v as Record<string, unknown>;
+    return {
+      ...v,
+      valor_implantacao: (row.valor_implantacao as number) ?? (row.valor as number) ?? 0,
+      valor_mensal:      (row.valor_mensal as number) ?? 0,
+      servicos:      venda_servicos.map((vs) => vs.servico),
+      vendedor_nome: vendedores?.nome ?? null,
+    };
+  });
 }
 
 async function uploadAnexo(vendaId: string, file: File): Promise<{ url: string; nome: string }> {
