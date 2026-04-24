@@ -42,7 +42,8 @@ const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
   status:               { label: "Status",                    dot: "bg-folk" },
   temperatura:          { label: "Temperatura",               dot: "bg-amber-400" },
   vendedor:             { label: "Vendedor",                  dot: "bg-blue-400" },
-  valor:                { label: "Valor",                     dot: "bg-green-500" },
+  valor_implantacao:    { label: "Valor de implantação",       dot: "bg-green-500" },
+  valor_mensal:         { label: "Valor mensal",               dot: "bg-emerald-400" },
   data_lead:            { label: "Data do lead",              dot: "bg-blue-300" },
   cliente:              { label: "Cliente",                   dot: "bg-gray-500" },
   indicado_por:         { label: "Indicado por",              dot: "bg-amber-400" },
@@ -58,7 +59,8 @@ function formatLogMsg(log: PipelineLog): string {
     case "status":               return `"${log.valor_anterior}" → "${log.valor_novo}"`;
     case "temperatura":          return `${log.valor_anterior} → ${log.valor_novo}`;
     case "vendedor":             return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "valor":                return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "valor_implantacao":    return `${log.valor_anterior} → ${log.valor_novo}`;
+    case "valor_mensal":         return `${log.valor_anterior} → ${log.valor_novo}`;
     case "servico_adicionado":   return log.valor_novo;
     case "servico_removido":     return log.valor_anterior;
     case "conversao":            return "Proposta convertida em venda";
@@ -104,7 +106,8 @@ interface FormState {
   vendedor_id: string;
   cliente: string;
   temperatura: Temperatura;
-  valor_aproximado: string;
+  valor_implantacao: string;
+  valor_mensal: string;
   status: StatusPipeline;
   servicos: string[];
   indicado_por: string;
@@ -113,7 +116,7 @@ interface FormState {
 
 const FORM_VAZIO: FormState = {
   data_inicio_lead: "", vendedor_id: "", cliente: "",
-  temperatura: "morna", valor_aproximado: "", status: "apresentacao",
+  temperatura: "morna", valor_implantacao: "", valor_mensal: "", status: "apresentacao",
   servicos: [], indicado_por: "", observacoes: "",
 };
 
@@ -183,7 +186,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   }
   function abrirEditar(r: PipelineItem) {
     setEditando(r);
-    setForm({ data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "", cliente: r.cliente, temperatura: r.temperatura, valor_aproximado: String(r.valor_aproximado), status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por, observacoes: r.observacoes });
+    setForm({ data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "", cliente: r.cliente, temperatura: r.temperatura, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por, observacoes: r.observacoes });
     setErroForm(null); markClean(); setView("form"); carregarLogs(r.id);
   }
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
@@ -195,15 +198,16 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     setSalvando(true); setErroForm(null);
     try {
       const payload: PipelinePayload = {
-        data_inicio_lead: form.data_inicio_lead,
-        vendedor_id:      form.vendedor_id || null,
-        cliente:          form.cliente.trim(),
-        temperatura:      form.temperatura,
-        valor_aproximado: parseFloat(form.valor_aproximado.replace(",", ".")) || 0,
-        status:           form.status,
-        servicos:         form.servicos,
-        indicado_por:     form.indicado_por.trim(),
-        observacoes:      form.observacoes.trim(),
+        data_inicio_lead:  form.data_inicio_lead,
+        vendedor_id:       form.vendedor_id || null,
+        cliente:           form.cliente.trim(),
+        temperatura:       form.temperatura,
+        valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
+        valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
+        status:            form.status,
+        servicos:          form.servicos,
+        indicado_por:      form.indicado_por.trim(),
+        observacoes:       form.observacoes.trim(),
       };
       const idEditado = editando?.id ?? null;
       if (editando) await editarPipelineItem(editando.id, payload, editando, vendedores);
@@ -235,9 +239,9 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     onConverter(item);
   }
 
-  const totalPotencial = registros
-    .filter((r) => !["fechado", "declinado"].includes(r.status))
-    .reduce((acc, r) => acc + r.valor_aproximado, 0);
+  const ativos = registros.filter((r) => !["fechado", "declinado"].includes(r.status));
+  const totalImplantacao = ativos.reduce((acc, r) => acc + r.valor_implantacao, 0);
+  const totalMensal      = ativos.reduce((acc, r) => acc + r.valor_mensal, 0);
 
   // ── Formulário + Histórico ─────────────────────────────────
 
@@ -295,8 +299,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Valor aproximado (R$)</label>
-              <input type="number" min="0" step="0.01" value={form.valor_aproximado} onChange={(e) => set("valor_aproximado", e.target.value)} placeholder="0,00"
+              <label className={LABEL}>Implantação (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.valor_implantacao} onChange={(e) => set("valor_implantacao", e.target.value)} placeholder="0,00"
+                disabled={!!editando?.convertido_em_venda}
+                className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
+              {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Mensal (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.valor_mensal} onChange={(e) => set("valor_mensal", e.target.value)} placeholder="0,00"
                 disabled={!!editando?.convertido_em_venda}
                 className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
@@ -396,8 +407,12 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} proposta${registros.length !== 1 ? "s" : ""}`}</p>
-          {registros.length > 0 && (
-            <p className="text-sm font-semibold text-gray-700">Potencial: <span className="text-folk">{formatMoeda(totalPotencial)}</span></p>
+          {ativos.length > 0 && (
+            <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
+              {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
+              {totalImplantacao > 0 && totalMensal > 0 && <span className="text-gray-300">·</span>}
+              {totalMensal > 0 && <span>MRR potencial: <span className="text-emerald-600">{formatMoeda(totalMensal)}/mês</span></span>}
+            </div>
           )}
         </div>
         <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
@@ -430,7 +445,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                     {r.vendedor_nome && <><span>{r.vendedor_nome}</span><span>·</span></>}
                     {r.indicado_por  && <><span>Indicado por {r.indicado_por}</span><span>·</span></>}
                     <span>Lead desde {formatData(r.data_inicio_lead)}</span>
-                    {r.valor_aproximado > 0 && <><span>·</span><span className="font-semibold text-gray-600">{formatMoeda(r.valor_aproximado)}</span></>}
+                    {(r.valor_implantacao > 0 || r.valor_mensal > 0) && (
+                      <><span>·</span><span className="font-semibold text-gray-600">
+                        {r.valor_implantacao > 0 && r.valor_mensal > 0
+                          ? `${formatMoeda(r.valor_implantacao)} + ${formatMoeda(r.valor_mensal)}/mês`
+                          : r.valor_implantacao > 0
+                          ? formatMoeda(r.valor_implantacao)
+                          : `${formatMoeda(r.valor_mensal)}/mês`}
+                      </span></>
+                    )}
                   </div>
                   {r.servicos?.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido, registrarOrigemVenda,
   listarLogsVenda,
@@ -127,6 +127,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [editando, setEditando] = useState<Venda | null>(null);
   const [form, setForm] = useState<FormState>(preenchimento ? formDePreenchimento(preenchimento) : FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [excluindo, setExcluindo]     = useState<string | null>(null);
   const [enviando, setEnviando]       = useState<string | null>(null);
@@ -191,7 +192,9 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (salvandoRef.current) return;
     if (!form.data_fechamento || !form.cliente) { setErroForm("Preencha todos os campos obrigatórios."); return; }
+    salvandoRef.current = true;
     setSalvando(true); setErroForm(null);
     try {
       const payload: VendaPayload = {
@@ -218,7 +221,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
       markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
-    } finally { setSalvando(false); }
+    } finally { salvandoRef.current = false; setSalvando(false); }
   }
 
   async function handleExcluir(id: string) {

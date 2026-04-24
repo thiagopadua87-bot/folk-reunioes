@@ -26,7 +26,7 @@ export default function ComercialPage() {
       pipeline_id:  item.id,
       cliente:      item.cliente,
       vendedor_id:  item.vendedor_id,
-      valor:        item.valor_aproximado,
+      valor:        item.valor_implantacao,
       servicos:     item.servicos ?? [],
       observacoes:  item.observacoes,
       indicado_por: item.indicado_por,

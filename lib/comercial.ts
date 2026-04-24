@@ -65,7 +65,8 @@ export interface PipelineItem {
   vendedor_nome: string | null;
   cliente: string;
   temperatura: Temperatura;
-  valor_aproximado: number;
+  valor_implantacao: number;
+  valor_mensal: number;
   status: StatusPipeline;
   indicado_por: string;
   observacoes: string;
@@ -469,8 +470,11 @@ async function registrarAlteracoes(
     logs.push({ proposta_id: propostaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo, autor_nome: autorNome });
   }
 
-  if (antigo.valor_aproximado !== novo.valor_aproximado) {
-    logs.push({ proposta_id: propostaId, campo: "valor", valor_anterior: formatMoeda(antigo.valor_aproximado), valor_novo: formatMoeda(novo.valor_aproximado), autor_nome: autorNome });
+  if (antigo.valor_implantacao !== novo.valor_implantacao) {
+    logs.push({ proposta_id: propostaId, campo: "valor_implantacao", valor_anterior: formatMoeda(antigo.valor_implantacao), valor_novo: formatMoeda(novo.valor_implantacao), autor_nome: autorNome });
+  }
+  if (antigo.valor_mensal !== novo.valor_mensal) {
+    logs.push({ proposta_id: propostaId, campo: "valor_mensal", valor_anterior: formatMoeda(antigo.valor_mensal), valor_novo: formatMoeda(novo.valor_mensal), autor_nome: autorNome });
   }
 
   const antigosServicos = antigo.servicos ?? [];

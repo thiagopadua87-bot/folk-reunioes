@@ -32,10 +32,11 @@ CREATE TABLE public.pipeline (
   data_inicio_lead DATE        NOT NULL,
   responsavel      TEXT        NOT NULL DEFAULT '',
   cliente          TEXT        NOT NULL,
-  temperatura      TEXT        NOT NULL CHECK (temperatura IN ('fria','morna','quente')),
-  valor_aproximado NUMERIC     NOT NULL DEFAULT 0,
-  status           TEXT        NOT NULL CHECK (status IN (
-                     'apresentacao','em_analise','assinatura','fechado','declinado')),
+  temperatura        TEXT        NOT NULL CHECK (temperatura IN ('fria','morna','quente')),
+  valor_implantacao  NUMERIC     NOT NULL DEFAULT 0,
+  valor_mensal       NUMERIC     NOT NULL DEFAULT 0,
+  status             TEXT        NOT NULL CHECK (status IN (
+                     'apresentacao','em_analise','assinatura','fechado','declinado','fechado_ganho')),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
