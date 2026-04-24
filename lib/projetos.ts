@@ -284,6 +284,9 @@ async function registrarAlteracoesObra(
   if (antigo.andamento !== novo.andamento)
     logs.push({ obra_id: obraId, campo: "andamento", valor_anterior: `${antigo.andamento}%`, valor_novo: `${novo.andamento}%` });
 
+  if ((antigo.observacoes ?? "") !== (novo.observacoes ?? ""))
+    logs.push({ obra_id: obraId, campo: "observacoes", valor_anterior: antigo.observacoes || "—", valor_novo: novo.observacoes || "—" });
+
   if (logs.length === 0) return;
   await supabase.from("obra_logs").insert(logs);
 }

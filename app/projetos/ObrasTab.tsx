@@ -40,6 +40,7 @@ const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
   terceirizado:   { label: "Terceirizado",           dot: "bg-orange-400" },
   valor_execucao: { label: "Valor de execução",      dot: "bg-green-400" },
   andamento:      { label: "Andamento",              dot: "bg-green-500" },
+  observacoes:    { label: "Observações",            dot: "bg-amber-400" },
 };
 
 function formatLogTs(s: string): string {
