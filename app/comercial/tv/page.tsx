@@ -161,12 +161,13 @@ export default function ComercialTVPage() {
   const portaria       = vendas.filter((v) => v.servicos?.includes("Portaria Remota"));
   const totalReceita   = portaria.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
   const totalContratos = portaria.length;
-  const nivel          = getNivel(totalReceita);
-  const pct            = Math.min(totalReceita / META_OURO, 1);
-  const proxMeta       = totalReceita < META_BRONZE ? META_BRONZE
-                       : totalReceita < META_PRATA  ? META_PRATA
-                       : totalReceita < META_OURO   ? META_OURO
-                       : null;
+  const nivel      = getNivel(totalReceita);
+  const pct        = Math.min(totalReceita / META_OURO, 1);
+  const pctBronze  = Math.min(Math.round((totalReceita / META_BRONZE) * 100), 100);
+  const proxMeta   = totalReceita < META_BRONZE ? META_BRONZE
+                   : totalReceita < META_PRATA  ? META_PRATA
+                   : totalReceita < META_OURO   ? META_OURO
+                   : null;
 
   // Última venda e ranking: todos os serviços
   const ultimaVendaGeral = [...vendas].sort(
@@ -349,7 +350,7 @@ export default function ComercialTVPage() {
                     </p>
                     <p className="mt-2 text-lg font-bold text-amber-600">para 🥉 BRONZE</p>
                     <p className="mt-1 text-sm text-gray-500">
-                      Você está a {Math.round((totalReceita / META_BRONZE) * 100)}% da primeira meta!
+                      Você está a {pctBronze}% da primeira meta!
                     </p>
                   </>
                 )}
