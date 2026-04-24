@@ -8,6 +8,7 @@ import {
 } from "@/lib/comercial";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const TIPO_BADGE: Record<TipoVenda, string> = {
   recorrente:   "bg-folk/10 text-folk border-folk/20",
@@ -122,14 +123,16 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setView("form"); }
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
     setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor: String(r.valor), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
-    setErroForm(null); setErroCNPJ(null); setArquivo(null); setView("form");
+    setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form");
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); onPreenchimentoUsado?.(); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); onPreenchimentoUsado?.(); }); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function buscarRazaoSocial(cnpjMascarado: string) {
     const digits = cnpjMascarado.replace(/\D/g, "");
@@ -174,7 +177,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
           onPreenchimentoUsado?.();
         }
       }
-      setView("list"); setEditando(null); await carregar();
+      markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally { setSalvando(false); }

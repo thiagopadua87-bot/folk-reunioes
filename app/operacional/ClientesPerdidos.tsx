@@ -8,6 +8,7 @@ import {
   type ClientePerdido, type TipoServico, type MotivoPerda, type FiltrosClientesPerdidos,
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // ── Tipos de formulário ──────────────────────────────────────
 
@@ -97,28 +98,20 @@ export default function ClientesPerdidos() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
   function abrirFormNovo() {
-    setEditando(null);
-    setForm(FORM_VAZIO);
-    setErroForm(null);
-    setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form");
   }
 
   function abrirFormEditar(r: ClientePerdido) {
-    setEditando(r);
-    setForm(registroParaForm(r));
-    setErroForm(null);
-    setView("form");
+    setEditando(r); setForm(registroParaForm(r)); setErroForm(null); markClean(); setView("form");
   }
 
-  function cancelar() {
-    setView("list");
-    setEditando(null);
-    setErroForm(null);
-  }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
-    setForm((prev) => ({ ...prev, [k]: v }));
+    setForm((prev) => ({ ...prev, [k]: v })); markDirty();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -133,9 +126,7 @@ export default function ClientesPerdidos() {
       const payload = formParaPayload(form);
       if (editando) await editarClientePerdido(editando.id, payload);
       else           await criarClientePerdido(payload);
-      setView("list");
-      setEditando(null);
-      await carregar();
+      markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally {

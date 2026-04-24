@@ -7,6 +7,7 @@ import {
   type Terceirizado, type TerceirizadoPayload, type FiltrosTerceirizados,
 } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
@@ -51,7 +52,9 @@ export default function TerceirizadosTab() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setView("form"); }
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form"); }
   function abrirEditar(r: Terceirizado) {
     setEditando(r);
     setForm({
@@ -59,10 +62,10 @@ export default function TerceirizadosTab() {
       telefone: r.telefone, email: r.email, nome_responsavel: r.nome_responsavel,
       cpf_responsavel: r.cpf_responsavel, ativo: r.ativo,
     });
-    setErroForm(null); setView("form");
+    setErroForm(null); markClean(); setView("form");
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleCNPJ(raw: string) {
     const masked = formatarCNPJ(raw);
@@ -97,7 +100,7 @@ export default function TerceirizadosTab() {
       };
       if (editando) await editarTerceirizado(editando.id, payload);
       else           await criarTerceirizado(payload);
-      setView("list"); setEditando(null); await carregar();
+      markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally { setSalvando(false); }

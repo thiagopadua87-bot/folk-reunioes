@@ -11,6 +11,7 @@ import {
 } from "@/lib/comercial";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // ── Estilos visuais ──────────────────────────────────────────
 
@@ -171,18 +172,18 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     finally { setCarregandoLogs(false); }
   }
 
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
   function abrirNovo() {
-    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form");
   }
   function abrirEditar(r: PipelineItem) {
     setEditando(r);
     setForm({ data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "", cliente: r.cliente, temperatura: r.temperatura, valor_aproximado: String(r.valor_aproximado), status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por, observacoes: r.observacoes });
-    setErroForm(null);
-    setView("form");
-    carregarLogs(r.id);
+    setErroForm(null); markClean(); setView("form"); carregarLogs(r.id);
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -203,6 +204,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       const idEditado = editando?.id ?? null;
       if (editando) await editarPipelineItem(editando.id, payload, editando, vendedores);
       else           await criarPipelineItem(payload);
+      markClean();
       await carregar();
       // Se estava editando, recarrega logs e permanece na tela
       if (idEditado) {

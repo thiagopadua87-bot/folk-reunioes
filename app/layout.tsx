@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AppHeader from "./components/AppHeader";
+import { UnsavedChangesProvider } from "@/lib/unsaved-changes";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -19,8 +20,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full bg-[#F5F5F5] text-gray-900">
-        <AppHeader />
-        {children}
+        <UnsavedChangesProvider>
+          <AppHeader />
+          {children}
+        </UnsavedChangesProvider>
       </body>
     </html>
   );

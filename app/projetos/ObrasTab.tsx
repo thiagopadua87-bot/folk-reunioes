@@ -12,6 +12,7 @@ import {
 import { listarTecnicos, listarTerceirizados, type Tecnico, type Terceirizado } from "@/lib/cadastros";
 import { SERVICOS_COMERCIAL } from "@/lib/comercial";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // ── Estilos ──────────────────────────────────────────────────
 
@@ -145,7 +146,9 @@ export default function ObrasTab() {
     finally { setCarregandoLogs(false); }
   }
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); setView("form"); }
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(o: Obra) {
     setEditando(o);
     setForm({
@@ -162,10 +165,10 @@ export default function ObrasTab() {
       andamento:       String(o.andamento),
       observacoes:     o.observacoes ?? "",
     });
-    setErroForm(null); setView("form"); carregarLogs(o.id);
+    setErroForm(null); markClean(); setView("form"); carregarLogs(o.id);
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -193,6 +196,7 @@ export default function ObrasTab() {
       const idEditado = editando?.id ?? null;
       if (editando) await editarObra(editando.id, payload, editando, tecnicos, terceirizados);
       else           await criarObra(payload);
+      markClean();
       await carregar();
       if (idEditado) {
         setEditando((prev) => prev ? { ...prev, ...payload } : null);

@@ -10,6 +10,7 @@ import {
 } from "@/lib/projetos";
 import { SERVICOS_COMERCIAL } from "@/lib/comercial";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const SITUACAO_BADGE: Record<SituacaoProjeto, string> = {
   em_execucao:           "bg-folk/10 text-folk border-folk/20",
@@ -92,14 +93,16 @@ export default function ProjetosTab() {
     finally { setCarregandoLogs(false); }
   }
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); setView("form"); }
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(r: Projeto) {
     setEditando(r);
     setForm({ data_inicio: r.data_inicio, cliente: r.cliente, servicos: r.servicos ?? [], situacao: r.situacao, valor: String(r.valor), observacoes: r.observacoes ?? "" });
-    setErroForm(null); setView("form"); carregarLogs(r.id);
+    setErroForm(null); markClean(); setView("form"); carregarLogs(r.id);
   }
-  function cancelar() { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -110,6 +113,7 @@ export default function ProjetosTab() {
       const idEditado = editando?.id ?? null;
       if (editando) await editarProjeto(editando.id, payload, editando);
       else           await criarProjeto(payload);
+      markClean();
       await carregar();
       if (idEditado) {
         setEditando((prev) => prev ? { ...prev, ...payload } : null);

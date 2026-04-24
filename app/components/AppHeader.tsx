@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import LogoFolk from "./LogoFolk";
 import LogoutButton from "./LogoutButton";
 import { supabase } from "@/lib/supabase";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const NAV_BASE = [
   { label: "Início",       href: "/" },
@@ -20,6 +21,7 @@ export default function AppHeader() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { isDirty, guardNavigate } = useUnsavedChanges();
 
   useEffect(() => {
     async function loadUser() {
@@ -66,6 +68,12 @@ export default function AppHeader() {
               <Link
                 key={href}
                 href={href}
+                onClick={(e) => {
+                  if (isDirty) {
+                    e.preventDefault();
+                    guardNavigate(href);
+                  }
+                }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-folk/10 text-folk"

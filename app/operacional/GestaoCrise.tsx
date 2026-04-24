@@ -8,6 +8,7 @@ import {
   type CriseItem, type TipoServico, type NivelRisco,
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
+import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // ── Estilos de risco ─────────────────────────────────────────
 
@@ -72,28 +73,22 @@ export default function GestaoCrise() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  const { markDirty, markClean, guardCancel } = useUnsavedChanges();
+
   function abrirFormNovo() {
-    setEditando(null);
-    setForm(FORM_VAZIO);
-    setErroForm(null);
-    setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form");
   }
 
   function abrirFormEditar(c: CriseItem) {
     setEditando(c);
     setForm({ cliente: c.cliente, tipo_servico: c.tipo_servico, risco: c.risco, acoes: c.acoes });
-    setErroForm(null);
-    setView("form");
+    setErroForm(null); markClean(); setView("form");
   }
 
-  function cancelar() {
-    setView("list");
-    setEditando(null);
-    setErroForm(null);
-  }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
-    setForm((prev) => ({ ...prev, [k]: v }));
+    setForm((prev) => ({ ...prev, [k]: v })); markDirty();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -108,9 +103,7 @@ export default function GestaoCrise() {
       const payload = { cliente: form.cliente.trim(), tipo_servico: form.tipo_servico, risco: form.risco, acoes: form.acoes.trim() };
       if (editando) await editarCrise(editando.id, payload);
       else           await criarCrise(payload);
-      setView("list");
-      setEditando(null);
-      await carregar();
+      markClean(); setView("list"); setEditando(null); await carregar();
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally {
