@@ -157,7 +157,7 @@ function mapRawVenda({ venda_servicos, vendedores, ...v }: RawVenda): Venda {
   };
 }
 
-export async function listarVendas(filtros?: FiltrosVendas): Promise<PaginaVendas> {
+export async function listarVendas(filtros?: FiltrosVendas, signal?: AbortSignal): Promise<PaginaVendas> {
   const pagina    = filtros?.pagina    ?? 1;
   const porPagina = filtros?.porPagina ?? 10;
   const offset    = (pagina - 1) * porPagina;
@@ -166,7 +166,8 @@ export async function listarVendas(filtros?: FiltrosVendas): Promise<PaginaVenda
     .from("vendas")
     .select("*, venda_servicos(servico), vendedores!vendedor_id(nome)", { count: "exact" })
     .order("data_fechamento", { ascending: false })
-    .range(offset, offset + porPagina - 1);
+    .range(offset, offset + porPagina - 1)
+    .abortSignal(signal ?? new AbortController().signal);
   if (filtros?.dataInicio) q = q.gte("data_fechamento", filtros.dataInicio);
   if (filtros?.dataFim)    q = q.lte("data_fechamento", filtros.dataFim);
   if (filtros?.tipoVenda)  q = q.eq("tipo_venda", filtros.tipoVenda);
