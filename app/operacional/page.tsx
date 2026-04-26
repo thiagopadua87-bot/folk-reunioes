@@ -13,10 +13,17 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
 ];
 
 export default function OperacionalPage() {
-  const [aba, setAba] = useState<Aba>("clientes-perdidos");
+  const [aba, setAba]                         = useState<Aba>("clientes-perdidos");
+  const [focoRegistroId, setFocoRegistroId]   = useState<string | null>(null);
   const abaAtual = ABAS.find((a) => a.value === aba)!;
   const { guardCancel } = useUnsavedChanges();
-  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); };
+
+  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); }
+
+  function navegarParaClientePerdido(id: string) {
+    setFocoRegistroId(id);
+    setAba("clientes-perdidos");
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -44,8 +51,15 @@ export default function OperacionalPage() {
       </div>
 
       {/* Conteúdo da aba */}
-      {aba === "clientes-perdidos" && <ClientesPerdidos />}
-      {aba === "gestao-crise"      && <GestaoCrise />}
+      {aba === "clientes-perdidos" && (
+        <ClientesPerdidos
+          focoRegistroId={focoRegistroId}
+          onFocoConsumido={() => setFocoRegistroId(null)}
+        />
+      )}
+      {aba === "gestao-crise" && (
+        <GestaoCrise onNavigarParaClientePerdido={navegarParaClientePerdido} />
+      )}
     </main>
   );
 }

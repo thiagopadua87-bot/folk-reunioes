@@ -22,7 +22,7 @@ export function CardHeader({ children, className }: CardProps) {
 }
 
 interface AlertProps {
-  status: "success" | "error";
+  status: "success" | "error" | "warning";
   message: string;
 }
 
@@ -30,6 +30,8 @@ export function Alert({ status, message }: AlertProps) {
   const cls =
     status === "success"
       ? "border-green-200 bg-green-50 text-green-700"
+      : status === "warning"
+      ? "border-yellow-200 bg-yellow-50 text-yellow-700"
       : "border-red-200 bg-red-50 text-red-700";
   return (
     <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${cls}`}>

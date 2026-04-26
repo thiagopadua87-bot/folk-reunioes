@@ -84,7 +84,12 @@ const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
 // ── Componente principal ─────────────────────────────────────
 
-export default function ClientesPerdidos() {
+interface ClientesPerdidosProps {
+  focoRegistroId?: string | null;
+  onFocoConsumido?: () => void;
+}
+
+export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFocoConsumido: _onFocoConsumido }: ClientesPerdidosProps = {}) {
   const [registros, setRegistros] = useState<ClientePerdido[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
