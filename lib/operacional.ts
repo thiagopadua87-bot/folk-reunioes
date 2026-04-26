@@ -19,9 +19,10 @@ export const MOTIVOS_PERDA = [
 ] as const;
 
 export const NIVEIS_RISCO = [
-  { value: "baixo", label: "Baixo" },
-  { value: "medio", label: "Médio" },
-  { value: "alto",  label: "Alto" },
+  { value: "baixo",     label: "Baixo" },
+  { value: "medio",     label: "Médio" },
+  { value: "alto",      label: "Alto" },
+  { value: "revertido", label: "Revertido" },
 ] as const;
 
 export type TipoServico = (typeof TIPOS_SERVICO)[number]["value"];
@@ -31,6 +32,7 @@ export type NivelRisco  = (typeof NIVEIS_RISCO)[number]["value"];
 export interface ClientePerdido {
   id: string;
   user_id: string;
+  crise_id: string | null;
   data_aviso: string;
   data_encerramento: string;
   cliente: string;
@@ -48,6 +50,13 @@ export interface CriseItem {
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
+  apresentou_carta_cancelamento: boolean;
+  data_aviso: string | null;
+  prazo_aviso_dias: number | null;
+  carta_url: string | null;
+  carta_nome: string | null;
+  promovido_para_perdido: boolean;
+  cliente_perdido_id: string | null;
   created_at: string;
 }
 
@@ -71,6 +80,132 @@ export interface CriseLog {
   valor_novo: string;
   autor_nome: string | null;
   created_at: string;
+}
+
+// ── Histórico de eventos ─────────────────────────────────────
+
+export interface EventoHistorico {
+  id: string;
+  icone: string;
+  titulo: string;
+  descricao: string;
+  autor_nome: string | null;
+  created_at: string;
+  fonte: "crise" | "cliente_perdido";
+}
+
+export function formatarEventoCrise(log: CriseLog): EventoHistorico {
+  let icone: string;
+  let titulo: string;
+  let descricao: string;
+
+  switch (log.campo) {
+    case "crise_criada":
+      icone = "🔔"; titulo = "Crise registrada"; descricao = log.valor_novo || "";
+      break;
+    case "risco":
+      if (log.valor_novo === "Revertido") {
+        icone = "✅"; titulo = "Crise revertida"; descricao = `Risco anterior: ${log.valor_anterior}`;
+      } else {
+        icone = "⚠️"; titulo = "Risco alterado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      }
+      break;
+    case "apresentou_carta_cancelamento":
+      if (log.valor_novo === "sim") {
+        icone = "📄"; titulo = "Carta de cancelamento registrada"; descricao = "";
+      } else {
+        icone = "🗑️"; titulo = "Carta de cancelamento removida"; descricao = "";
+      }
+      break;
+    case "data_aviso":
+      icone = "📅"; titulo = "Data de aviso atualizada";
+      descricao = log.valor_anterior ? `${log.valor_anterior} → ${log.valor_novo}` : log.valor_novo;
+      break;
+    case "prazo_aviso_dias":
+      icone = "⏱️"; titulo = "Prazo de aviso atualizado";
+      descricao = log.valor_anterior ? `${log.valor_anterior} → ${log.valor_novo} dias` : `${log.valor_novo} dias`;
+      break;
+    case "carta_arquivo":
+      icone = "📎"; titulo = "Arquivo da carta anexado"; descricao = log.valor_novo;
+      break;
+    case "promovido_para_perdido":
+      icone = "➡️"; titulo = "Promovido a Cliente Perdido"; descricao = "";
+      break;
+    case "acoes":
+      icone = "📝"; titulo = "Ações atualizadas"; descricao = "";
+      break;
+    case "cliente":
+      icone = "👤"; titulo = "Cliente atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "tipo_servico":
+      icone = "🔧"; titulo = "Tipo de serviço atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    default:
+      icone = "📋"; titulo = log.campo;
+      descricao = log.valor_anterior ? `${log.valor_anterior} → ${log.valor_novo}` : log.valor_novo;
+  }
+
+  return { id: log.id, icone, titulo, descricao, autor_nome: log.autor_nome, created_at: log.created_at, fonte: "crise" };
+}
+
+export function formatarEventoClientePerdido(log: ClientePerdidoLog): EventoHistorico {
+  let icone: string;
+  let titulo: string;
+  let descricao: string;
+
+  switch (log.campo) {
+    case "cliente_perdido_criado":
+      icone = "📌"; titulo = "Registrado como cliente perdido"; descricao = log.valor_novo || "";
+      break;
+    case "data_aviso":
+      icone = "📅"; titulo = "Data de aviso atualizada"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "data_encerramento":
+      icone = "🗓️"; titulo = "Data de encerramento atualizada"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "valor_contrato":
+      icone = "💰"; titulo = "Valor do contrato atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "motivo_perda":
+      icone = "❓"; titulo = "Motivo da perda atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "observacoes":
+      icone = "📝"; titulo = "Observações atualizadas"; descricao = "";
+      break;
+    case "cliente":
+      icone = "👤"; titulo = "Cliente atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    case "tipo_servico":
+      icone = "🔧"; titulo = "Tipo de serviço atualizado"; descricao = `${log.valor_anterior} → ${log.valor_novo}`;
+      break;
+    default:
+      icone = "📋"; titulo = log.campo;
+      descricao = log.valor_anterior ? `${log.valor_anterior} → ${log.valor_novo}` : log.valor_novo;
+  }
+
+  return { id: log.id, icone, titulo, descricao, autor_nome: log.autor_nome, created_at: log.created_at, fonte: "cliente_perdido" };
+}
+
+// ── Helpers de data ──────────────────────────────────────────
+
+export function calcularEncerramentoBR(dataAviso: string, prazoDias: number): string {
+  const d = new Date(dataAviso + "T00:00:00");
+  d.setDate(d.getDate() + prazoDias);
+  return d.toLocaleDateString("pt-BR");
+}
+
+export function calcularEncerramentoISO(dataAviso: string, prazoDias: number): string {
+  const d = new Date(dataAviso + "T00:00:00");
+  d.setDate(d.getDate() + prazoDias);
+  return d.toISOString().split("T")[0];
+}
+
+export function diasParaEncerramento(dataAviso: string, prazoDias: number): number {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const enc = new Date(dataAviso + "T00:00:00");
+  enc.setDate(enc.getDate() + prazoDias);
+  return Math.round((enc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 // ── Auth helper ──────────────────────────────────────────────
@@ -194,7 +329,18 @@ export async function excluirClientePerdido(id: string): Promise<void> {
 
 // ── Gestão de Crise ──────────────────────────────────────────
 
-const PESO_RISCO: Record<NivelRisco, number> = { alto: 0, medio: 1, baixo: 2 };
+// Menor número = aparece primeiro (sort ascendente); revertido fica por último
+const PESO_RISCO: Record<NivelRisco, number> = { alto: 0, medio: 1, baixo: 2, revertido: 3 };
+
+export type CriseEditPayload = {
+  cliente: string;
+  tipo_servico: TipoServico;
+  risco: NivelRisco;
+  acoes: string;
+  apresentou_carta_cancelamento: boolean;
+  data_aviso: string | null;
+  prazo_aviso_dias: number | null;
+};
 
 export async function listarCrises(filtros?: { risco?: NivelRisco | "" }): Promise<CriseItem[]> {
   let q = supabase.from("gestao_crise").select("*");
@@ -208,10 +354,25 @@ export async function listarCrises(filtros?: { risco?: NivelRisco | "" }): Promi
 }
 
 export async function criarCrise(
-  payload: Omit<CriseItem, "id" | "user_id" | "created_at">
-): Promise<void> {
-  const { error } = await supabase.from("gestao_crise").insert(payload);
-  if (error) throw new Error(error.message);
+  payload: CriseEditPayload
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("gestao_crise")
+    .insert({ ...payload, promovido_para_perdido: false, cliente_perdido_id: null, carta_url: null, carta_nome: null })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar crise.");
+
+  const autorNome = await getAutorNome();
+  await supabase.from("crise_logs").insert({
+    crise_id: data.id,
+    campo: "crise_criada",
+    valor_anterior: "",
+    valor_novo: payload.cliente,
+    autor_nome: autorNome,
+  });
+
+  return data.id;
 }
 
 export async function listarLogsCrise(criseId: string): Promise<CriseLog[]> {
@@ -224,10 +385,24 @@ export async function listarLogsCrise(criseId: string): Promise<CriseLog[]> {
   return (data ?? []) as CriseLog[];
 }
 
+export async function listarHistoricoUnificado(
+  criseId: string,
+  clientePerdidoId: string,
+): Promise<EventoHistorico[]> {
+  const [criseLogs, clienteLogs] = await Promise.all([
+    listarLogsCrise(criseId),
+    listarLogsClientePerdido(clientePerdidoId),
+  ]);
+  return [
+    ...criseLogs.map(formatarEventoCrise),
+    ...clienteLogs.map(formatarEventoClientePerdido),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
 async function registrarAlteracoesCrise(
   id: string,
   antigo: CriseItem,
-  novo: Omit<CriseItem, "id" | "user_id" | "created_at">,
+  novo: CriseEditPayload,
 ): Promise<void> {
   type LogInput = { crise_id: string; campo: string; valor_anterior: string; valor_novo: string; autor_nome: string | null };
   const autorNome = await getAutorNome();
@@ -245,18 +420,121 @@ async function registrarAlteracoesCrise(
   if ((antigo.acoes ?? "") !== (novo.acoes ?? ""))
     logs.push({ crise_id: id, campo: "acoes", valor_anterior: antigo.acoes || "—", valor_novo: novo.acoes || "—", autor_nome: autorNome });
 
+  const carteiraAntiga = antigo.apresentou_carta_cancelamento;
+  const carteiraNova   = novo.apresentou_carta_cancelamento;
+  if (carteiraAntiga !== carteiraNova)
+    logs.push({ crise_id: id, campo: "apresentou_carta_cancelamento", valor_anterior: carteiraAntiga ? "sim" : "não", valor_novo: carteiraNova ? "sim" : "não", autor_nome: autorNome });
+
+  if (carteiraNova) {
+    if ((antigo.data_aviso ?? "") !== (novo.data_aviso ?? "") && novo.data_aviso)
+      logs.push({ crise_id: id, campo: "data_aviso", valor_anterior: antigo.data_aviso ? formatData(antigo.data_aviso) : "—", valor_novo: formatData(novo.data_aviso), autor_nome: autorNome });
+
+    if (antigo.prazo_aviso_dias !== novo.prazo_aviso_dias && novo.prazo_aviso_dias != null)
+      logs.push({ crise_id: id, campo: "prazo_aviso_dias", valor_anterior: antigo.prazo_aviso_dias != null ? String(antigo.prazo_aviso_dias) : "—", valor_novo: String(novo.prazo_aviso_dias), autor_nome: autorNome });
+  }
+
   if (logs.length === 0) return;
   await supabase.from("crise_logs").insert(logs);
 }
 
 export async function editarCrise(
   id: string,
-  payload: Omit<CriseItem, "id" | "user_id" | "created_at">,
+  payload: CriseEditPayload,
   dadosAntigos?: CriseItem,
 ): Promise<void> {
   const { error } = await supabase.from("gestao_crise").update(payload).eq("id", id);
   if (error) throw new Error(error.message);
   if (dadosAntigos) registrarAlteracoesCrise(id, dadosAntigos, payload).catch(() => {});
+}
+
+export async function uploadCartaArquivo(criseId: string, file: File): Promise<void> {
+  const ext = file.name.split(".").pop() ?? "pdf";
+  const path = `${criseId}/${Date.now()}.${ext}`;
+  const { error: errUp } = await supabase.storage.from("cartas-cancelamento").upload(path, file, { upsert: true });
+  if (errUp) throw new Error(`Erro ao enviar arquivo: ${errUp.message}`);
+
+  const { data: urlData } = supabase.storage.from("cartas-cancelamento").getPublicUrl(path);
+  const { error: errUpdate } = await supabase
+    .from("gestao_crise")
+    .update({ carta_url: urlData.publicUrl, carta_nome: file.name })
+    .eq("id", criseId);
+  if (errUpdate) throw new Error(errUpdate.message);
+
+  const autorNome = await getAutorNome();
+  await supabase.from("crise_logs").insert({
+    crise_id: criseId,
+    campo: "carta_arquivo",
+    valor_anterior: "",
+    valor_novo: file.name,
+    autor_nome: autorNome,
+  });
+}
+
+export async function removerCartaArquivo(criseId: string, cartaNome: string): Promise<void> {
+  const { error } = await supabase
+    .from("gestao_crise")
+    .update({ carta_url: null, carta_nome: null })
+    .eq("id", criseId);
+  if (error) throw new Error(error.message);
+
+  const autorNome = await getAutorNome();
+  await supabase.from("crise_logs").insert({
+    crise_id: criseId,
+    campo: "carta_arquivo",
+    valor_anterior: cartaNome,
+    valor_novo: "",
+    autor_nome: autorNome,
+  });
+}
+
+export async function promoverCriseParaPerdido(
+  crise: CriseItem,
+  payload: {
+    data_aviso: string;
+    data_encerramento: string;
+    valor_contrato: number;
+    motivo_perda: MotivoPerda;
+    observacoes: string;
+  },
+): Promise<string> {
+  const autorNome = await getAutorNome();
+
+  const { data: perdido, error: errPerdido } = await supabase
+    .from("clientes_perdidos")
+    .insert({
+      crise_id: crise.id,
+      cliente: crise.cliente,
+      tipo_servico: crise.tipo_servico,
+      ...payload,
+    })
+    .select("id")
+    .single();
+
+  if (errPerdido || !perdido) throw new Error(errPerdido?.message ?? "Erro ao criar cliente perdido.");
+
+  await supabase.from("clientes_perdidos_logs").insert({
+    registro_id: perdido.id,
+    campo: "cliente_perdido_criado",
+    valor_anterior: "",
+    valor_novo: `Promovido da crise de ${crise.cliente}`,
+    autor_nome: autorNome,
+  });
+
+  const { error: errCrise } = await supabase
+    .from("gestao_crise")
+    .update({ promovido_para_perdido: true, cliente_perdido_id: perdido.id })
+    .eq("id", crise.id);
+  if (errCrise) throw new Error(errCrise.message);
+
+  await supabase.from("crise_logs").insert({
+    crise_id: crise.id,
+    campo: "promovido_para_perdido",
+    valor_anterior: "não",
+    valor_novo: "sim",
+    autor_nome: autorNome,
+  });
+
+  return perdido.id;
 }
 
 export async function excluirCrise(id: string): Promise<void> {

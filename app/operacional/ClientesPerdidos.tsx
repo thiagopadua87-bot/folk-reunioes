@@ -35,6 +35,7 @@ const FORM_VAZIO: FormState = {
 
 function formParaPayload(f: FormState): Omit<ClientePerdido, "id" | "user_id" | "created_at"> {
   return {
+    crise_id: null,
     data_aviso: f.data_aviso,
     data_encerramento: f.data_encerramento,
     cliente: f.cliente.trim(),

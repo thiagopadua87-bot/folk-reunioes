@@ -29,15 +29,17 @@ function formatLogTs(s: string): string {
 // ── Estilos de risco ─────────────────────────────────────────
 
 const RISCO_BADGE: Record<NivelRisco, string> = {
-  alto:  "bg-red-100 text-red-700 border-red-200",
-  medio: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  baixo: "bg-green-100 text-green-700 border-green-200",
+  alto:      "bg-red-100 text-red-700 border-red-200",
+  medio:     "bg-yellow-100 text-yellow-700 border-yellow-200",
+  baixo:     "bg-green-100 text-green-700 border-green-200",
+  revertido: "bg-green-50 text-green-700 border-green-200",
 };
 
 const RISCO_ROW: Record<NivelRisco, string> = {
-  alto:  "border-l-4 border-l-red-400",
-  medio: "border-l-4 border-l-yellow-400",
-  baixo: "border-l-4 border-l-green-400",
+  alto:      "border-l-4 border-l-red-400",
+  medio:     "border-l-4 border-l-yellow-400",
+  baixo:     "border-l-4 border-l-green-400",
+  revertido: "border-l-4 border-l-green-300",
 };
 
 // ── Tipos de formulário ──────────────────────────────────────
@@ -125,7 +127,15 @@ export default function GestaoCrise() {
     setSalvando(true);
     setErroForm(null);
     try {
-      const payload = { cliente: form.cliente.trim(), tipo_servico: form.tipo_servico, risco: form.risco, acoes: form.acoes.trim() };
+      const payload = {
+        cliente: form.cliente.trim(),
+        tipo_servico: form.tipo_servico,
+        risco: form.risco,
+        acoes: form.acoes.trim(),
+        apresentou_carta_cancelamento: false,
+        data_aviso: null,
+        prazo_aviso_dias: null,
+      };
       if (editando) await editarCrise(editando.id, payload, editando);
       else           await criarCrise(payload);
       markClean(); setView("list"); setEditando(null); await carregar();
