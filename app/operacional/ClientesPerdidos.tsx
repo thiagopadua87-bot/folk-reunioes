@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   listarClientesPerdidos, criarClientePerdido, editarClientePerdido, excluirClientePerdido,
-  listarLogsClientePerdido,
+  listarLogsClientePerdido, listarHistoricoUnificado,
+  formatarEventoClientePerdido,
   TIPOS_SERVICO, MOTIVOS_PERDA,
   labelTipoServico, labelMotivoPerda, formatMoeda, formatData,
-  type ClientePerdido, type ClientePerdidoLog, type TipoServico, type MotivoPerda, type FiltrosClientesPerdidos,
+  type ClientePerdido, type EventoHistorico, type TipoServico, type MotivoPerda,
+  type FiltrosClientesPerdidos,
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -33,9 +35,12 @@ const FORM_VAZIO: FormState = {
   observacoes: "",
 };
 
-function formParaPayload(f: FormState): Omit<ClientePerdido, "id" | "user_id" | "created_at"> {
+function formParaPayload(
+  f: FormState,
+  existingRecord?: ClientePerdido,
+): Omit<ClientePerdido, "id" | "user_id" | "created_at"> {
   return {
-    crise_id: null,
+    crise_id: existingRecord?.crise_id ?? null,
     data_aviso: f.data_aviso,
     data_encerramento: f.data_encerramento,
     cliente: f.cliente.trim(),
@@ -58,49 +63,53 @@ function registroParaForm(r: ClientePerdido): FormState {
   };
 }
 
-// ── Log helpers ─────────────────────────────────────────────
-
-const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  data_aviso:        { label: "Data do aviso",        dot: "bg-blue-400" },
-  data_encerramento: { label: "Data de encerramento", dot: "bg-red-400" },
-  cliente:           { label: "Cliente",              dot: "bg-gray-500" },
-  tipo_servico:      { label: "Tipo de serviço",      dot: "bg-folk" },
-  valor_contrato:    { label: "Valor do contrato",    dot: "bg-green-500" },
-  motivo_perda:      { label: "Motivo da perda",      dot: "bg-amber-400" },
-  observacoes:       { label: "Observações",          dot: "bg-amber-300" },
-};
+// ── Helpers ──────────────────────────────────────────────────
 
 function formatLogTs(s: string): string {
   const d = new Date(s);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " +
-         d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return (
+    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+    " " +
+    d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  );
 }
 
-// ── Estilos compartilhados ──────────────────────────────────
+// ── Estilos compartilhados ───────────────────────────────────
 
 const INPUT =
   "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
-// ── Componente principal ─────────────────────────────────────
+// ── Props ─────────────────────────────────────────────────────
 
 interface ClientesPerdidosProps {
   focoRegistroId?: string | null;
   onFocoConsumido?: () => void;
 }
 
-export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFocoConsumido: _onFocoConsumido }: ClientesPerdidosProps = {}) {
-  const [registros, setRegistros] = useState<ClientePerdido[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
-  const [view, setView] = useState<"list" | "form">("list");
-  const [editando, setEditando] = useState<ClientePerdido | null>(null);
-  const [form, setForm] = useState<FormState>(FORM_VAZIO);
-  const [salvando, setSalvando] = useState(false);
-  const [erroForm, setErroForm] = useState<string | null>(null);
-  const [excluindo, setExcluindo] = useState<string | null>(null);
-  const [logs, setLogs]           = useState<ClientePerdidoLog[]>([]);
+// ── Componente principal ─────────────────────────────────────
+
+export default function ClientesPerdidos({
+  focoRegistroId,
+  onFocoConsumido,
+}: ClientesPerdidosProps = {}) {
+  const [registros, setRegistros]         = useState<ClientePerdido[]>([]);
+  const [carregando, setCarregando]       = useState(true);
+  const [erro, setErro]                   = useState<string | null>(null);
+  const [view, setView]                   = useState<"list" | "form">("list");
+  const [editando, setEditando]           = useState<ClientePerdido | null>(null);
+  const [form, setForm]                   = useState<FormState>(FORM_VAZIO);
+  const [salvando, setSalvando]           = useState(false);
+  const [erroForm, setErroForm]           = useState<string | null>(null);
+  const [excluindo, setExcluindo]         = useState<string | null>(null);
+  const [logs, setLogs]                   = useState<EventoHistorico[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
+  const [highlightId, setHighlightId]     = useState<string | null>(null);
+
+  // Modal histórico
+  const [modalHistorico, setModalHistorico]           = useState<ClientePerdido | null>(null);
+  const [historico, setHistorico]                     = useState<EventoHistorico[]>([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
   const [filtros, setFiltros] = useState<FiltrosClientesPerdidos>({
     dataInicio: "", dataFim: "", motivo: "",
@@ -125,13 +134,31 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Foco/highlight cross-tab: scroll + ring de 2s após dados carregados
+  useEffect(() => {
+    if (!focoRegistroId || carregando) return;
+    setHighlightId(focoRegistroId);
+    const el = document.getElementById(`cp-row-${focoRegistroId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => {
+      setHighlightId(null);
+      onFocoConsumido?.();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [focoRegistroId, carregando, onFocoConsumido]);
+
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
-  async function carregarLogs(id: string) {
+  async function carregarLogsForm(id: string) {
     setCarregandoLogs(true);
-    try { setLogs(await listarLogsClientePerdido(id)); }
-    catch { setLogs([]); }
-    finally { setCarregandoLogs(false); }
+    try {
+      const raw = await listarLogsClientePerdido(id);
+      setLogs(raw.map(formatarEventoClientePerdido));
+    } catch {
+      setLogs([]);
+    } finally {
+      setCarregandoLogs(false);
+    }
   }
 
   function abrirFormNovo() {
@@ -139,7 +166,8 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
   }
 
   function abrirFormEditar(r: ClientePerdido) {
-    setEditando(r); setForm(registroParaForm(r)); setErroForm(null); markClean(); setView("form"); carregarLogs(r.id);
+    setEditando(r); setForm(registroParaForm(r)); setErroForm(null); markClean(); setView("form");
+    carregarLogsForm(r.id);
   }
 
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
@@ -157,7 +185,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
     setSalvando(true);
     setErroForm(null);
     try {
-      const payload = formParaPayload(form);
+      const payload = formParaPayload(form, editando ?? undefined);
       if (editando) await editarClientePerdido(editando.id, payload, editando);
       else           await criarClientePerdido(payload);
       markClean(); setView("list"); setEditando(null); await carregar();
@@ -170,17 +198,29 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
 
   async function handleExcluir(id: string) {
     setExcluindo(id);
+    try { await excluirClientePerdido(id); await carregar(); }
+    catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
+    finally { setExcluindo(null); }
+  }
+
+  async function abrirHistorico(r: ClientePerdido) {
+    setModalHistorico(r);
+    setCarregandoHistorico(true);
     try {
-      await excluirClientePerdido(id);
-      await carregar();
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao excluir.");
+      if (r.crise_id) {
+        setHistorico(await listarHistoricoUnificado(r.crise_id, r.id));
+      } else {
+        const raw = await listarLogsClientePerdido(r.id);
+        setHistorico(raw.map(formatarEventoClientePerdido));
+      }
+    } catch {
+      setHistorico([]);
     } finally {
-      setExcluindo(null);
+      setCarregandoHistorico(false);
     }
   }
 
-  // ── Formulário ─────────────────────────────────────────────
+  // ── Formulário ──────────────────────────────────────────────
 
   if (view === "form") {
     return (
@@ -193,6 +233,12 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             {editando ? "Editar registro" : "Novo cliente perdido"}
           </h2>
         </div>
+
+        {editando?.crise_id && (
+          <div className="mb-4">
+            <Alert status="warning" message="Registro originado da Gestão de Crise. Consulte o histórico para ver a linha do tempo completa." />
+          </div>
+        )}
 
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -214,9 +260,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Tipo de serviço</label>
               <select value={form.tipo_servico} onChange={(e) => set("tipo_servico", e.target.value as TipoServico)} className={INPUT}>
-                {TIPOS_SERVICO.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
+                {TIPOS_SERVICO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
@@ -228,9 +272,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Motivo da perda</label>
               <select value={form.motivo_perda} onChange={(e) => set("motivo_perda", e.target.value as MotivoPerda)} className={INPUT}>
-                {MOTIVOS_PERDA.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
+                {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
 
@@ -246,11 +288,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             )}
 
             <div className="flex gap-3 sm:col-span-2">
-              <button
-                type="submit"
-                disabled={salvando}
-                className="rounded-2xl bg-folk-gradient px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-60"
-              >
+              <button type="submit" disabled={salvando} className="rounded-2xl bg-folk-gradient px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-60">
                 {salvando ? "Salvando..." : editando ? "Salvar alterações" : "Criar registro"}
               </button>
               <button type="button" onClick={cancelar} className="rounded-2xl border border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:border-gray-300">
@@ -261,33 +299,35 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
         </Card>
 
         {editando && (
-          <Card className="p-6">
-            <h3 className="mb-4 text-sm font-semibold text-gray-800">Histórico de alterações</h3>
+          <Card className="mt-4 p-6">
+            <h3 className="mb-4 text-sm font-semibold text-gray-800">
+              Histórico{editando.crise_id ? " unificado (crise + cliente perdido)" : " de alterações"}
+            </h3>
             {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
             {!carregandoLogs && logs.length === 0 && (
               <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
             )}
             {!carregandoLogs && logs.length > 0 && (
               <div>
-                {logs.map((log, i) => {
-                  const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
-                  return (
-                    <div key={log.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                        {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
-                      </div>
-                      <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
-                        <p className="text-[11px] text-gray-400 mb-0.5">
-                          {formatLogTs(log.created_at)}
-                          {log.autor_nome && <span className="ml-1">· {log.autor_nome}</span>}
-                        </p>
-                        <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
-                        <p className="text-sm text-gray-700">{log.valor_anterior} → {log.valor_novo}</p>
-                      </div>
+                {logs.map((ev, i) => (
+                  <div key={ev.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="mt-0.5 text-base leading-none">{ev.icone}</span>
+                      {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
                     </div>
-                  );
-                })}
+                    <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
+                      <p className="text-[11px] text-gray-400 mb-0.5">
+                        {formatLogTs(ev.created_at)}
+                        {ev.autor_nome && <span className="ml-1">· {ev.autor_nome}</span>}
+                        {ev.fonte === "crise" && (
+                          <span className="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">crise</span>
+                        )}
+                      </p>
+                      <p className="text-xs font-semibold text-gray-700">{ev.titulo}</p>
+                      {ev.descricao && <p className="text-sm text-gray-500">{ev.descricao}</p>}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </Card>
@@ -296,7 +336,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
     );
   }
 
-  // ── Listagem ───────────────────────────────────────────────
+  // ── Listagem ────────────────────────────────────────────────
 
   return (
     <div>
@@ -315,9 +355,7 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             <label className={LABEL}>Motivo da perda</label>
             <select value={filtros.motivo} onChange={(e) => setFiltros((f) => ({ ...f, motivo: e.target.value as MotivoPerda | "" }))} className={INPUT}>
               <option value="">Todos</option>
-              {MOTIVOS_PERDA.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
+              {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
         </div>
@@ -356,14 +394,36 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
             </thead>
             <tbody>
               {registros.map((r) => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
+                <tr
+                  key={r.id}
+                  id={`cp-row-${r.id}`}
+                  className={[
+                    "border-b border-gray-100 last:border-0 transition-colors",
+                    highlightId === r.id
+                      ? "bg-folk/5 shadow-[inset_0_0_0_2px_theme(colors.folk/30%)]"
+                      : "hover:bg-gray-50/50",
+                  ].join(" ")}
+                >
                   <td className="py-3.5 pl-6 pr-4 text-sm text-gray-700">{formatData(r.data_aviso)}</td>
-                  <td className="py-3.5 pr-4 text-sm font-medium text-gray-900">{r.cliente}</td>
+                  <td className="py-3.5 pr-4">
+                    <p className="text-sm font-medium text-gray-900">{r.cliente}</p>
+                    {r.crise_id && (
+                      <button
+                        onClick={() => abrirHistorico(r)}
+                        className="mt-0.5 text-[11px] font-semibold text-amber-600 hover:underline"
+                      >
+                        Vindo da Gestão de Crise ↗
+                      </button>
+                    )}
+                  </td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{labelTipoServico(r.tipo_servico)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-700">{formatMoeda(r.valor_contrato)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{labelMotivoPerda(r.motivo_perda)}</td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">
+                      <button onClick={() => abrirHistorico(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">
+                        Histórico
+                      </button>
                       <button onClick={() => abrirFormEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">
                         Editar
                       </button>
@@ -376,6 +436,57 @@ export default function ClientesPerdidos({ focoRegistroId: _focoRegistroId, onFo
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Modal: Histórico de movimentações ── */}
+      {modalHistorico && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Histórico de movimentações</h3>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  {modalHistorico.cliente}
+                  {modalHistorico.crise_id && (
+                    <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
+                      crise + cliente perdido
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button onClick={() => setModalHistorico(null)} className="text-xl leading-none text-gray-400 hover:text-gray-600">×</button>
+            </div>
+            <div className="overflow-y-auto px-6 py-5">
+              {carregandoHistorico && <p className="text-sm text-gray-400">Carregando...</p>}
+              {!carregandoHistorico && historico.length === 0 && (
+                <p className="text-sm text-gray-400">Nenhuma movimentação registrada.</p>
+              )}
+              {!carregandoHistorico && historico.length > 0 && (
+                <div>
+                  {historico.map((ev, i) => (
+                    <div key={ev.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className="mt-0.5 text-base leading-none">{ev.icone}</span>
+                        {i < historico.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
+                      </div>
+                      <div className={`${i < historico.length - 1 ? "pb-4" : ""} min-w-0`}>
+                        <p className="text-[11px] text-gray-400 mb-0.5">
+                          {formatLogTs(ev.created_at)}
+                          {ev.autor_nome && <span className="ml-1">· {ev.autor_nome}</span>}
+                          {ev.fonte === "crise" && (
+                            <span className="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">crise</span>
+                          )}
+                        </p>
+                        <p className="text-xs font-semibold text-gray-700">{ev.titulo}</p>
+                        {ev.descricao && <p className="text-sm text-gray-500">{ev.descricao}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
