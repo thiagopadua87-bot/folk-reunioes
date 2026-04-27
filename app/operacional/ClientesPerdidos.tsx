@@ -411,20 +411,18 @@ export default function ClientesPerdidos({
       {/* KPIs por trimestre */}
       {!carregando && registros.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {(
-            [
-              { label: "T1", sub: "Jan–Mar", items: kpiTrimestres.t1, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
-              { label: "T2", sub: "Abr–Jun", items: kpiTrimestres.t2, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
-              { label: "T3", sub: "Jul–Set", items: kpiTrimestres.t3, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
-              { label: "T4", sub: "Out–Dez", items: kpiTrimestres.t4, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
-              { label: "Total", sub: "",    items: registros,          cls: "border-rose-200 bg-rose-50",  txt: "text-rose-700" },
-            ] as const
-          ).map(({ label, sub, items, cls, txt }) => (
+          {([
+            { label: "T1", sub: "Jan–Mar", items: kpiTrimestres.t1, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
+            { label: "T2", sub: "Abr–Jun", items: kpiTrimestres.t2, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
+            { label: "T3", sub: "Jul–Set", items: kpiTrimestres.t3, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
+            { label: "T4", sub: "Out–Dez", items: kpiTrimestres.t4, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
+            { label: "Total", sub: "",     items: registros,         cls: "border-folk/20 bg-folk/5",   txt: "text-folk-dark" },
+          ] as const).map(({ label, sub, items, cls, txt }) => (
             <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
-              <p className={`text-xs font-semibold uppercase tracking-wide ${txt} mb-0.5`}>
-                {label}
-                {sub && <span className="ml-1 font-normal normal-case opacity-60">{sub}</span>}
-              </p>
+              <div className="mb-1">
+                <p className={`text-xs font-semibold uppercase tracking-wide ${txt}`}>{label}</p>
+                {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
+              </div>
               <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
               {items.reduce((s, r) => s + r.valor_contrato, 0) > 0 && (
                 <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
