@@ -132,6 +132,7 @@ export interface FiltrosVendas {
   dataInicio?: string;
   dataFim?: string;
   tipoVenda?: TipoVenda | "";
+  cliente?: string;
   pagina?: number;
   porPagina?: number;
 }
@@ -170,6 +171,7 @@ export async function listarVendas(filtros?: FiltrosVendas): Promise<PaginaVenda
   if (filtros?.dataInicio) q = q.gte("data_fechamento", filtros.dataInicio);
   if (filtros?.dataFim)    q = q.lte("data_fechamento", filtros.dataFim);
   if (filtros?.tipoVenda)  q = q.eq("tipo_venda", filtros.tipoVenda);
+  if (filtros?.cliente)    q = q.ilike("cliente", `%${filtros.cliente}%`);
   const { data, error, count } = await q;
   if (error) throw new Error(error.message);
   return {

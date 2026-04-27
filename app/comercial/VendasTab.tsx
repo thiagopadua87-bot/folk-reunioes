@@ -136,7 +136,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [excluindo, setExcluindo]     = useState<string | null>(null);
   const [enviando, setEnviando]       = useState<string | null>(null);
   const [visualizando, setVisualizando] = useState<Venda | null>(null);
-  const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "" });
+  const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "", cliente: "" });
   const [pagina, setPagina]       = useState(1);
   const [porPagina, setPorPagina] = useState(10);
   const [total, setTotal]         = useState(0);
@@ -153,7 +153,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
     setCarregando(true); setErro(null);
     try {
       const [pagina_dados, vends] = await Promise.all([
-        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, pagina, porPagina }),
+        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, pagina, porPagina }),
         listarVendedores({ ativo: true }),
       ]);
       if (reqId !== reqIdRef.current) return;
@@ -453,7 +453,17 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
       )}
 
       <Card className="mb-5 p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+            <label className={LABEL}>Buscar cliente</label>
+            <input
+              type="text"
+              value={filtros.cliente ?? ""}
+              onChange={(e) => setFiltrosEResetar((f) => ({ ...f, cliente: e.target.value }))}
+              placeholder="Nome do cliente..."
+              className={INPUT}
+            />
+          </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Fechamento — de</label>
             <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, dataInicio: e.target.value }))} className={INPUT} />
@@ -514,9 +524,9 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                 <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                   <td className="py-3 pl-5 pr-3 text-xs text-gray-500 whitespace-nowrap">{formatData(r.data_fechamento)}</td>
                   <td className="py-3 pr-3">
-                    <p className="text-sm font-medium text-gray-900 truncate">{r.cliente}</p>
-                    {r.vendedor_nome && <p className="text-xs text-gray-400 truncate">{r.vendedor_nome}</p>}
-                    {r.cnpj && <p className="text-xs text-gray-400 truncate">{formatarCNPJ(r.cnpj)}</p>}
+                    <p className="text-sm font-medium text-gray-900 break-words">{r.cliente}</p>
+                    {r.vendedor_nome && <p className="text-xs text-gray-400">{r.vendedor_nome}</p>}
+                    {r.cnpj && <p className="text-xs text-gray-400">{formatarCNPJ(r.cnpj)}</p>}
                   </td>
                   <td className="py-3 pr-3">
                     {r.servicos?.length > 0 ? (

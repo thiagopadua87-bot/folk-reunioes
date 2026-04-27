@@ -143,6 +143,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [excluindo, setExcluindo]   = useState<string | null>(null);
   const [convertendo, setConvertendo] = useState<string | null>(null);
   const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "" });
+  const [buscaCliente, setBuscaCliente] = useState("");
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
 
@@ -163,7 +164,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     setCarregando(true); setErro(null);
     try {
       const [lista, vends] = await Promise.all([
-        listarPipeline({ temperatura: filtros.temperatura || undefined, status: filtros.status || undefined }),
+        listarPipeline(),
         listarVendedores({ ativo: true }),
       ]);
       if (reqId !== reqIdRef.current) return;
@@ -175,7 +176,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     } finally {
       if (reqId === reqIdRef.current) setCarregando(false);
     }
-  }, [filtros]);
+  }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -249,6 +250,20 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const ativos = registros.filter((r) => !["fechado", "declinado"].includes(r.status));
   const totalImplantacao = ativos.reduce((acc, r) => acc + r.valor_implantacao, 0);
   const totalMensal      = ativos.reduce((acc, r) => acc + r.valor_mensal, 0);
+
+  const statsPorTemp = {
+    quente: ativos.filter((r) => r.temperatura === "quente"),
+    morna:  ativos.filter((r) => r.temperatura === "morna"),
+    fria:   ativos.filter((r) => r.temperatura === "fria"),
+  };
+
+  const busca = buscaCliente.toLowerCase().trim();
+  const registrosExibidos = registros.filter((r) => {
+    if (filtros.temperatura && r.temperatura !== filtros.temperatura) return false;
+    if (filtros.status && r.status !== filtros.status) return false;
+    if (busca && !r.cliente.toLowerCase().includes(busca)) return false;
+    return true;
+  });
 
   // ── Formulário + Histórico ─────────────────────────────────
 
@@ -392,8 +407,40 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
   return (
     <div>
+      {/* ── Cards de resumo ── */}
+      {!carregando && ativos.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            { label: "Quente",  items: statsPorTemp.quente, cls: "border-red-200 bg-red-50",    txt: "text-red-700" },
+            { label: "Morna",   items: statsPorTemp.morna,  cls: "border-amber-200 bg-amber-50", txt: "text-amber-700" },
+            { label: "Fria",    items: statsPorTemp.fria,   cls: "border-blue-200 bg-blue-50",   txt: "text-blue-700" },
+            { label: "Total ativo", items: ativos,          cls: "border-gray-200 bg-gray-50",   txt: "text-gray-700" },
+          ] as const).map(({ label, items, cls, txt }) => (
+            <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${txt} mb-1`}>{label}</p>
+              <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
+              {items.reduce((s, r) => s + r.valor_mensal, 0) > 0 && (
+                <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
+                  {formatMoeda(items.reduce((s, r) => s + r.valor_mensal, 0))}/mês
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <Card className="mb-5 p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5 sm:col-span-1">
+            <label className={LABEL}>Buscar cliente</label>
+            <input
+              type="text"
+              value={buscaCliente}
+              onChange={(e) => setBuscaCliente(e.target.value)}
+              placeholder="Nome do cliente..."
+              className={INPUT}
+            />
+          </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Temperatura</label>
             <select value={filtros.temperatura} onChange={(e) => setFiltros((f) => ({ ...f, temperatura: e.target.value as Temperatura | "" }))} className={INPUT}>
@@ -413,7 +460,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} proposta${registros.length !== 1 ? "s" : ""}`}</p>
+          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registrosExibidos.length} proposta${registrosExibidos.length !== 1 ? "s" : ""}`}</p>
           {ativos.length > 0 && (
             <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
               {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
@@ -429,18 +476,18 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
       {erro && <Alert status="error" message={erro} />}
 
-      {!carregando && registros.length === 0 && !erro && (
+      {!carregando && registrosExibidos.length === 0 && !erro && (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">Nenhuma proposta no pipeline.</div>
       )}
 
-      {registros.length > 0 && (
+      {registrosExibidos.length > 0 && (
         <div className="flex flex-col gap-3">
-          {registros.map((r) => (
+          {registrosExibidos.map((r) => (
             <div key={r.id} className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${TEMP_BORDA[r.temperatura]}`}>
               <div className="flex items-start justify-between gap-4 px-6 py-4">
                 <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-gray-900 break-words mb-1">{r.cliente}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-bold text-gray-900">{r.cliente}</p>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TEMP_BADGE[r.temperatura]}`}>
                       {labelTemperatura(r.temperatura)}
                     </span>
