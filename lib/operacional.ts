@@ -50,6 +50,7 @@ export interface CriseItem {
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
+  valor_contrato: number;
   apresentou_carta_cancelamento: boolean;
   data_aviso: string | null;
   prazo_aviso_dias: number | null;
@@ -337,6 +338,7 @@ export type CriseEditPayload = {
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
+  valor_contrato: number;
   apresentou_carta_cancelamento: boolean;
   data_aviso: string | null;
   prazo_aviso_dias: number | null;
@@ -358,7 +360,7 @@ export async function criarCrise(
 ): Promise<string> {
   const { data, error } = await supabase
     .from("gestao_crise")
-    .insert({ ...payload, promovido_para_perdido: false, cliente_perdido_id: null, carta_url: null, carta_nome: null })
+    .insert({ ...payload, promovido_para_perdido: false, cliente_perdido_id: null, carta_url: null, carta_nome: null, valor_contrato: payload.valor_contrato ?? 0 })
     .select("id")
     .single();
   if (error || !data) throw new Error(error?.message ?? "Erro ao criar crise.");

@@ -5,7 +5,7 @@ import {
   listarCrises, criarCrise, editarCrise, excluirCrise,
   listarLogsCrise, uploadCartaArquivo, removerCartaArquivo, promoverCriseParaPerdido,
   calcularEncerramentoBR, calcularEncerramentoISO, diasParaEncerramento,
-  formatarEventoCrise,
+  formatarEventoCrise, formatMoeda,
   TIPOS_SERVICO, NIVEIS_RISCO, MOTIVOS_PERDA,
   labelTipoServico, labelNivelRisco, formatData,
   type CriseItem, type EventoHistorico,
@@ -63,6 +63,7 @@ interface FormState {
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
+  valor_contrato: string;
   apresentou_carta_cancelamento: boolean;
   data_aviso: string;
   prazo_aviso_dias: string;
@@ -73,6 +74,7 @@ const FORM_VAZIO: FormState = {
   tipo_servico: "portaria_remota",
   risco: "medio",
   acoes: "",
+  valor_contrato: "",
   apresentou_carta_cancelamento: false,
   data_aviso: "",
   prazo_aviso_dias: "",
@@ -134,14 +136,14 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
     setCarregando(true);
     setErro(null);
     try {
-      const data = await listarCrises({ risco: filtroRisco || undefined });
+      const data = await listarCrises();
       setCrises(data);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally {
       setCarregando(false);
     }
-  }, [filtroRisco]);
+  }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -171,6 +173,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
       tipo_servico: c.tipo_servico,
       risco: c.risco,
       acoes: c.acoes,
+      valor_contrato: c.valor_contrato > 0 ? String(c.valor_contrato) : "",
       apresentou_carta_cancelamento: c.apresentou_carta_cancelamento,
       data_aviso: c.data_aviso ?? "",
       prazo_aviso_dias: c.prazo_aviso_dias != null ? String(c.prazo_aviso_dias) : "",
@@ -204,6 +207,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
         tipo_servico: form.tipo_servico,
         risco: form.risco,
         acoes: form.acoes.trim(),
+        valor_contrato: parseFloat(form.valor_contrato.replace(",", ".")) || 0,
         apresentou_carta_cancelamento: form.apresentou_carta_cancelamento,
         data_aviso: form.apresentou_carta_cancelamento && form.data_aviso ? form.data_aviso : null,
         prazo_aviso_dias:
@@ -258,7 +262,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
         c.data_aviso && c.prazo_aviso_dias
           ? calcularEncerramentoISO(c.data_aviso, c.prazo_aviso_dias)
           : "",
-      valor_contrato: "",
+      valor_contrato: c.valor_contrato > 0 ? String(c.valor_contrato) : "",
       motivo_perda: "qualidade_servico",
       observacoes: c.acoes.trim(),
     });
@@ -362,6 +366,17 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
               >
                 {NIVEIS_RISCO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Valor do contrato (R$)</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={form.valor_contrato}
+                onChange={(e) => set("valor_contrato", e.target.value)}
+                placeholder="0,00"
+                className={INPUT}
+              />
             </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -544,8 +559,43 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
 
   // ── Listagem ────────────────────────────────────────────────
 
+  const ativas = crises.filter((c) => !c.promovido_para_perdido && c.risco !== "revertido");
+  const emAviso = ativas.filter((c) => c.apresentou_carta_cancelamento);
+  const stats = {
+    alto:  ativas.filter((c) => c.risco === "alto"),
+    medio: ativas.filter((c) => c.risco === "medio"),
+    baixo: ativas.filter((c) => c.risco === "baixo"),
+  };
+  const totalValor = (arr: CriseItem[]) => arr.reduce((s, c) => s + (c.valor_contrato ?? 0), 0);
+
+  const crisesExibidas = filtroRisco
+    ? crises.filter((c) => c.risco === filtroRisco)
+    : crises;
+
   return (
     <div>
+      {/* ── Painel de resumo ── */}
+      {!carregando && ativas.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            { label: "Risco Alto",  items: stats.alto,  cls: "border-red-200 bg-red-50",      txt: "text-red-700" },
+            { label: "Risco Médio", items: stats.medio, cls: "border-yellow-200 bg-yellow-50", txt: "text-yellow-700" },
+            { label: "Risco Baixo", items: stats.baixo, cls: "border-green-200 bg-green-50",   txt: "text-green-700" },
+            { label: "Em Aviso",    items: emAviso,     cls: "border-blue-200 bg-blue-50",     txt: "text-blue-700" },
+          ] as const).map(({ label, items, cls, txt }) => (
+            <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${txt} mb-1`}>{label}</p>
+              <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
+              {totalValor(items as CriseItem[]) > 0 && (
+                <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
+                  {formatMoeda(totalValor(items as CriseItem[]))}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Filtro por risco */}
       <div className="mb-5 flex flex-wrap items-center gap-2">
         {(
@@ -574,7 +624,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
       {/* Cabeçalho + botão novo */}
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          {carregando ? "Carregando..." : `${crises.length} registro${crises.length !== 1 ? "s" : ""}`}
+          {carregando ? "Carregando..." : `${crisesExibidas.length} registro${crisesExibidas.length !== 1 ? "s" : ""}`}
         </p>
         <button
           onClick={abrirFormNovo}
@@ -586,15 +636,15 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
 
       {erro && <Alert status="error" message={erro} />}
 
-      {!carregando && crises.length === 0 && !erro && (
+      {!carregando && crisesExibidas.length === 0 && !erro && (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">
           Nenhuma crise registrada.
         </div>
       )}
 
-      {crises.length > 0 && (
+      {crisesExibidas.length > 0 && (
         <div className="flex flex-col gap-3">
-          {crises.map((c) => {
+          {crisesExibidas.map((c) => {
             const cartaBadge      = getCartaBadge(c);
             const estaPromovido   = c.promovido_para_perdido;
             const estaRevertido   = c.risco === "revertido";
@@ -627,7 +677,12 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                       )}
                     </div>
 
-                    <p className="text-xs text-gray-400">{labelTipoServico(c.tipo_servico)}</p>
+                    <p className="text-xs text-gray-400">
+                      {labelTipoServico(c.tipo_servico)}
+                      {c.valor_contrato > 0 && (
+                        <span className="ml-2 font-semibold text-gray-600">{formatMoeda(c.valor_contrato)}</span>
+                      )}
+                    </p>
 
                     {/* Datas da carta */}
                     {c.apresentou_carta_cancelamento && c.data_aviso && (
@@ -691,6 +746,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
           })}
         </div>
       )}
+
 
       {/* ── Modal: Promover a Cliente Perdido ── */}
       {modalPromover && (
