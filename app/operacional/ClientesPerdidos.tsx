@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   listarClientesPerdidos, criarClientePerdido, editarClientePerdido, excluirClientePerdido,
   listarLogsClientePerdido, listarHistoricoUnificado,
@@ -117,6 +117,18 @@ export default function ClientesPerdidos({
   const [filtros, setFiltros] = useState<FiltrosClientesPerdidos>({
     dataInicio: "", dataFim: "", motivo: "",
   });
+
+  const kpiTrimestres = useMemo(() => {
+    const t1: ClientePerdido[] = [], t2: ClientePerdido[] = [], t3: ClientePerdido[] = [], t4: ClientePerdido[] = [];
+    for (const r of registros) {
+      const mes = parseInt(r.data_encerramento.slice(5, 7), 10);
+      if (mes <= 3) t1.push(r);
+      else if (mes <= 6) t2.push(r);
+      else if (mes <= 9) t3.push(r);
+      else t4.push(r);
+    }
+    return { t1, t2, t3, t4 };
+  }, [registros]);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -393,6 +405,34 @@ export default function ClientesPerdidos({
       {erroExclusao && (
         <div className="mb-4">
           <Alert status="error" message={erroExclusao} />
+        </div>
+      )}
+
+      {/* KPIs por trimestre */}
+      {!carregando && registros.length > 0 && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {(
+            [
+              { label: "T1", sub: "Jan–Mar", items: kpiTrimestres.t1, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
+              { label: "T2", sub: "Abr–Jun", items: kpiTrimestres.t2, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
+              { label: "T3", sub: "Jul–Set", items: kpiTrimestres.t3, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
+              { label: "T4", sub: "Out–Dez", items: kpiTrimestres.t4, cls: "border-gray-200 bg-gray-50",  txt: "text-gray-700" },
+              { label: "Total", sub: "",    items: registros,          cls: "border-rose-200 bg-rose-50",  txt: "text-rose-700" },
+            ] as const
+          ).map(({ label, sub, items, cls, txt }) => (
+            <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${txt} mb-0.5`}>
+                {label}
+                {sub && <span className="ml-1 font-normal normal-case opacity-60">{sub}</span>}
+              </p>
+              <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
+              {items.reduce((s, r) => s + r.valor_contrato, 0) > 0 && (
+                <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
+                  {formatMoeda(items.reduce((s, r) => s + r.valor_contrato, 0))}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
