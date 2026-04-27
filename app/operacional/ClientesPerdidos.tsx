@@ -361,11 +361,11 @@ export default function ClientesPerdidos({
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
-            <label className={LABEL}>Data aviso — de</label>
+            <label className={LABEL}>Data encerramento — de</label>
             <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltros((f) => ({ ...f, dataInicio: e.target.value }))} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={LABEL}>Data aviso — até</label>
+            <label className={LABEL}>Data encerramento — até</label>
             <input type="date" value={filtros.dataFim} onChange={(e) => setFiltros((f) => ({ ...f, dataFim: e.target.value }))} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -407,7 +407,7 @@ export default function ClientesPerdidos({
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Data aviso</th>
+                <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Encerramento</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de serviço</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
@@ -427,7 +427,7 @@ export default function ClientesPerdidos({
                       : "hover:bg-gray-50/50",
                   ].join(" ")}
                 >
-                  <td className="py-3.5 pl-6 pr-4 text-sm text-gray-700">{formatData(r.data_aviso)}</td>
+                  <td className="py-3.5 pl-6 pr-4 text-sm text-gray-700">{formatData(r.data_encerramento)}</td>
                   <td className="py-3.5 pr-4">
                     <p className="text-sm font-medium text-gray-900">{r.cliente}</p>
                     {r.crise_id && (

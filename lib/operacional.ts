@@ -250,10 +250,10 @@ export async function listarClientesPerdidos(
   let q = supabase
     .from("clientes_perdidos")
     .select("*")
-    .order("data_aviso", { ascending: false });
+    .order("data_encerramento", { ascending: false });
 
-  if (filtros?.dataInicio) q = q.gte("data_aviso", filtros.dataInicio);
-  if (filtros?.dataFim)    q = q.lte("data_aviso", filtros.dataFim);
+  if (filtros?.dataInicio) q = q.gte("data_encerramento", filtros.dataInicio);
+  if (filtros?.dataFim)    q = q.lte("data_encerramento", filtros.dataFim);
   if (filtros?.motivo)     q = q.eq("motivo_perda", filtros.motivo);
 
   const { data, error } = await q;
