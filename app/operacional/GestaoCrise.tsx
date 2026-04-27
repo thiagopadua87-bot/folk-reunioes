@@ -671,15 +671,16 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                     <button
                       onClick={() => abrirModalPromover(c)}
                       disabled={bloqueadoPromover}
-                      title={estaPromovido ? "Já promovido" : estaRevertido ? "Crise revertida" : ""}
+                      title={estaPromovido ? "Já marcado como contrato perdido" : estaRevertido ? "Crise revertida" : ""}
                       className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      Promover
+                      Contrato Perdido
                     </button>
                     <button
                       onClick={() => handleExcluir(c.id)}
-                      disabled={excluindo === c.id}
-                      className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                      disabled={excluindo === c.id || estaPromovido}
+                      title={estaPromovido ? "Não é possível excluir um registro promovido a contrato perdido" : ""}
+                      className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {excluindo === c.id ? "..." : "Excluir"}
                     </button>

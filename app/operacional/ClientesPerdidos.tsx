@@ -12,6 +12,7 @@ import {
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import { supabase } from "@/lib/supabase";
 
 // ── Tipos de formulário ──────────────────────────────────────
 
@@ -96,6 +97,8 @@ export default function ClientesPerdidos({
   const [registros, setRegistros]         = useState<ClientePerdido[]>([]);
   const [carregando, setCarregando]       = useState(true);
   const [erro, setErro]                   = useState<string | null>(null);
+  const [isAdmin, setIsAdmin]             = useState(false);
+  const [erroExclusao, setErroExclusao]   = useState<string | null>(null);
   const [view, setView]                   = useState<"list" | "form">("list");
   const [editando, setEditando]           = useState<ClientePerdido | null>(null);
   const [form, setForm]                   = useState<FormState>(FORM_VAZIO);
@@ -114,6 +117,16 @@ export default function ClientesPerdidos({
   const [filtros, setFiltros] = useState<FiltrosClientesPerdidos>({
     dataInicio: "", dataFim: "", motivo: "",
   });
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      setIsAdmin(profile?.role === "admin");
+    }
+    checkAdmin();
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -197,6 +210,10 @@ export default function ClientesPerdidos({
   }
 
   async function handleExcluir(id: string) {
+    if (!isAdmin) {
+      setErroExclusao("Exclusão de registros é restrita a administradores. Entre em contato com o administrador do sistema.");
+      return;
+    }
     setExcluindo(id);
     try { await excluirClientePerdido(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
@@ -373,6 +390,12 @@ export default function ClientesPerdidos({
 
       {erro && <Alert status="error" message={erro} />}
 
+      {erroExclusao && (
+        <div className="mb-4">
+          <Alert status="error" message={erroExclusao} />
+        </div>
+      )}
+
       {!carregando && registros.length === 0 && !erro && (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">
           Nenhum registro encontrado.
@@ -427,7 +450,12 @@ export default function ClientesPerdidos({
                       <button onClick={() => abrirFormEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">
                         Editar
                       </button>
-                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+                      <button
+                        onClick={() => handleExcluir(r.id)}
+                        disabled={excluindo === r.id}
+                        title={!isAdmin ? "Apenas administradores podem excluir registros" : ""}
+                        className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                      >
                         {excluindo === r.id ? "..." : "Excluir"}
                       </button>
                     </div>
