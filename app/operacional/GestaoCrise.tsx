@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listarCrises, criarCrise, editarCrise, excluirCrise,
   listarLogsCrise, uploadCartaArquivo, removerCartaArquivo, promoverCriseParaPerdido,
+  listarCrisisActions, criarCrisisAction, editarCrisisAction, excluirCrisisAction,
   calcularEncerramentoBR, calcularEncerramentoISO, diasParaEncerramento,
   formatarEventoCrise, formatMoeda,
   TIPOS_SERVICO, NIVEIS_RISCO, MOTIVOS_PERDA,
@@ -11,6 +12,7 @@ import {
   type CriseItem, type EventoHistorico,
   type TipoServico, type NivelRisco, type MotivoPerda,
   type CriseEditPayload,
+  type CrisisAction, type CrisisActionStatus, type CrisisActionPayload,
 } from "@/lib/operacional";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -62,7 +64,6 @@ interface FormState {
   cliente: string;
   tipo_servico: TipoServico;
   risco: NivelRisco;
-  acoes: string;
   valor_contrato: string;
   apresentou_carta_cancelamento: boolean;
   data_aviso: string;
@@ -73,11 +74,34 @@ const FORM_VAZIO: FormState = {
   cliente: "",
   tipo_servico: "portaria_remota",
   risco: "medio",
-  acoes: "",
   valor_contrato: "",
   apresentou_carta_cancelamento: false,
   data_aviso: "",
   prazo_aviso_dias: "",
+};
+
+interface AcaoFormState {
+  what: string;
+  how: string;
+  who: string;
+  when_date: string;
+  status: CrisisActionStatus;
+}
+
+const ACAO_FORM_VAZIO: AcaoFormState = {
+  what: "", how: "", who: "", when_date: "", status: "PENDENTE",
+};
+
+const STATUS_BADGE: Record<CrisisActionStatus, string> = {
+  PENDENTE:     "bg-gray-100 text-gray-600",
+  EM_ANDAMENTO: "bg-amber-100 text-amber-700",
+  CONCLUIDO:    "bg-green-100 text-green-700",
+};
+
+const STATUS_LABEL: Record<CrisisActionStatus, string> = {
+  PENDENTE:     "Pendente",
+  EM_ANDAMENTO: "Em andamento",
+  CONCLUIDO:    "Concluído",
 };
 
 interface FormPromoverState {
@@ -130,6 +154,16 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
   const [historico, setHistorico]                     = useState<EventoHistorico[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
+  // Crisis Actions
+  const [crisisActions, setCrisisActions]             = useState<CrisisAction[]>([]);
+  const [carregandoAcoes, setCarregandoAcoes]         = useState(false);
+  const [modalAcao, setModalAcao]                     = useState<{ aberto: boolean; editandoAcao: CrisisAction | null }>({ aberto: false, editandoAcao: null });
+  const [formAcao, setFormAcao]                       = useState<AcaoFormState>(ACAO_FORM_VAZIO);
+  const [salvandoAcao, setSalvandoAcao]               = useState(false);
+  const [erroAcao, setErroAcao]                       = useState<string | null>(null);
+  const [excluindoAcao, setExcluindoAcao]             = useState<string | null>(null);
+  const [confirmacaoExcluirAcaoId, setConfirmacaoExcluirAcaoId] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
@@ -161,6 +195,73 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
     }
   }
 
+  async function carregarAcoes(criseId: string) {
+    setCarregandoAcoes(true);
+    try {
+      setCrisisActions(await listarCrisisActions(criseId));
+    } catch {
+      setCrisisActions([]);
+    } finally {
+      setCarregandoAcoes(false);
+    }
+  }
+
+  function abrirModalNovaAcao() {
+    setFormAcao(ACAO_FORM_VAZIO);
+    setErroAcao(null);
+    setModalAcao({ aberto: true, editandoAcao: null });
+  }
+
+  function abrirModalEditarAcao(a: CrisisAction) {
+    setFormAcao({ what: a.what, how: a.how, who: a.who, when_date: a.when_date, status: a.status });
+    setErroAcao(null);
+    setModalAcao({ aberto: true, editandoAcao: a });
+  }
+
+  async function handleSalvarAcao() {
+    if (!formAcao.what.trim() || !formAcao.who.trim() || !formAcao.when_date) {
+      setErroAcao("Preencha os campos obrigatórios: O que, Quem e Quando.");
+      return;
+    }
+    if (!editando) return;
+    setSalvandoAcao(true);
+    setErroAcao(null);
+    try {
+      const payload: CrisisActionPayload = {
+        what: formAcao.what.trim(),
+        how: formAcao.how.trim(),
+        who: formAcao.who.trim(),
+        when_date: formAcao.when_date,
+        status: formAcao.status,
+      };
+      if (modalAcao.editandoAcao) {
+        await editarCrisisAction(modalAcao.editandoAcao.id, payload);
+      } else {
+        await criarCrisisAction(editando.id, payload);
+      }
+      setModalAcao({ aberto: false, editandoAcao: null });
+      await carregarAcoes(editando.id);
+    } catch (e) {
+      setErroAcao(e instanceof Error ? e.message : "Erro ao salvar ação.");
+    } finally {
+      setSalvandoAcao(false);
+    }
+  }
+
+  async function handleExcluirAcao(id: string) {
+    if (!editando) return;
+    setExcluindoAcao(id);
+    try {
+      await excluirCrisisAction(id);
+      await carregarAcoes(editando.id);
+    } catch {
+      // silently ignore
+    } finally {
+      setExcluindoAcao(null);
+      setConfirmacaoExcluirAcaoId(null);
+    }
+  }
+
   function abrirFormNovo() {
     setEditando(null); setForm(FORM_VAZIO); setArquivoNovo(null);
     setErroForm(null); setLogs([]); markClean(); setView("form");
@@ -172,7 +273,6 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
       cliente: c.cliente,
       tipo_servico: c.tipo_servico,
       risco: c.risco,
-      acoes: c.acoes,
       valor_contrato: c.valor_contrato > 0 ? String(c.valor_contrato) : "",
       apresentou_carta_cancelamento: c.apresentou_carta_cancelamento,
       data_aviso: c.data_aviso ?? "",
@@ -180,15 +280,17 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
     });
     setArquivoNovo(null);
     setErroForm(null);
+    setCrisisActions([]);
     markClean();
     setView("form");
     carregarLogs(c.id);
+    carregarAcoes(c.id);
   }
 
   function cancelar() {
     guardCancel(() => {
       setView("list"); setEditando(null); setErroForm(null);
-      setLogs([]); setArquivoNovo(null);
+      setLogs([]); setArquivoNovo(null); setCrisisActions([]);
     });
   }
 
@@ -206,7 +308,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
         cliente: form.cliente.trim(),
         tipo_servico: form.tipo_servico,
         risco: form.risco,
-        acoes: form.acoes.trim(),
+        acoes: editando?.acoes ?? "",
         valor_contrato: parseFloat(form.valor_contrato.replace(",", ".")) || 0,
         apresentou_carta_cancelamento: form.apresentou_carta_cancelamento,
         data_aviso: form.apresentou_carta_cancelamento && form.data_aviso ? form.data_aviso : null,
@@ -334,7 +436,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
 
         {bloqueadoRiscoAcoes && (
           <div className="mb-4">
-            <Alert status="warning" message="Crise promovida a Cliente Perdido — risco e ações não editáveis." />
+            <Alert status="warning" message="Crise promovida a Cliente Perdido — nível de risco não editável." />
           </div>
         )}
 
@@ -376,18 +478,6 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                 onChange={(e) => set("valor_contrato", e.target.value)}
                 placeholder="0,00"
                 className={INPUT}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className={LABEL}>Ações tomadas / plano</label>
-              <textarea
-                value={form.acoes}
-                onChange={(e) => set("acoes", e.target.value)}
-                disabled={bloqueadoRiscoAcoes}
-                placeholder="Descreva as ações em andamento ou planejadas..."
-                rows={4}
-                className={`${INPUT} resize-none`}
               />
             </div>
 
@@ -523,6 +613,226 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
             </div>
           </form>
         </Card>
+
+        {/* ── Ações estruturadas ── */}
+        {editando && (() => {
+          const hoje = new Date().toISOString().split("T")[0];
+          const total = crisisActions.length;
+          const concluidas = crisisActions.filter((a) => a.status === "CONCLUIDO").length;
+          const atrasadas  = crisisActions.filter((a) => a.when_date < hoje && a.status !== "CONCLUIDO").length;
+          return (
+            <Card className="mt-4 p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-800">Ações</h3>
+                <button
+                  type="button"
+                  onClick={abrirModalNovaAcao}
+                  className="rounded-xl bg-folk-gradient px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
+                >
+                  + Adicionar ação
+                </button>
+              </div>
+
+              {total > 0 && (
+                <div className="mb-4 flex flex-wrap gap-4 rounded-xl bg-gray-50 px-4 py-2.5 text-xs">
+                  <span className="text-gray-500">
+                    Total: <span className="font-semibold text-gray-700">{total}</span>
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-gray-500">
+                    Concluídas:{" "}
+                    <span className="font-semibold text-green-600">
+                      {Math.round((concluidas / total) * 100)}%
+                    </span>
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-gray-500">
+                    Atrasadas:{" "}
+                    <span className={`font-semibold ${atrasadas > 0 ? "text-red-600" : "text-gray-700"}`}>
+                      {Math.round((atrasadas / total) * 100)}%
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {carregandoAcoes && <p className="text-sm text-gray-400">Carregando...</p>}
+
+              {!carregandoAcoes && total === 0 && (
+                <p className="text-sm text-gray-400">Nenhuma ação registrada ainda.</p>
+              )}
+
+              {!carregandoAcoes && total > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <th className="px-4 py-2.5">O que</th>
+                        <th className="px-4 py-2.5">Como</th>
+                        <th className="px-4 py-2.5">Quem</th>
+                        <th className="px-4 py-2.5">Quando</th>
+                        <th className="px-4 py-2.5">Status</th>
+                        <th className="px-4 py-2.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {crisisActions.map((a) => {
+                        const atrasada = a.when_date < hoje && a.status !== "CONCLUIDO";
+                        return (
+                          <tr
+                            key={a.id}
+                            className={[
+                              "border-b border-gray-100 last:border-0",
+                              atrasada ? "bg-red-50" : "hover:bg-gray-50/50",
+                            ].join(" ")}
+                          >
+                            <td className="px-4 py-3 font-medium text-gray-900">{a.what}</td>
+                            <td className="px-4 py-3 text-gray-500">{a.how || "—"}</td>
+                            <td className="px-4 py-3 text-gray-700">{a.who}</td>
+                            <td className="px-4 py-3">
+                              <span className={atrasada ? "font-semibold text-red-600" : "text-gray-700"}>
+                                {formatData(a.when_date)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[a.status]}`}>
+                                {STATUS_LABEL[a.status]}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => abrirModalEditarAcao(a)}
+                                  className="text-xs font-semibold text-gray-500 hover:text-folk"
+                                >
+                                  Editar
+                                </button>
+                                {confirmacaoExcluirAcaoId === a.id ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleExcluirAcao(a.id)}
+                                      disabled={excluindoAcao === a.id}
+                                      className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-50"
+                                    >
+                                      {excluindoAcao === a.id ? "..." : "Confirmar"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmacaoExcluirAcaoId(null)}
+                                      className="text-xs text-gray-400 hover:text-gray-600"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmacaoExcluirAcaoId(a.id)}
+                                    className="text-xs font-semibold text-red-400 hover:text-red-600"
+                                  >
+                                    Excluir
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          );
+        })()}
+
+        {/* ── Modal: Nova / Editar ação ── */}
+        {modalAcao.aberto && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h3 className="text-base font-bold text-gray-900">
+                  {modalAcao.editandoAcao ? "Editar ação" : "Nova ação"}
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 gap-4 px-6 py-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>O que *</label>
+                  <input
+                    type="text"
+                    value={formAcao.what}
+                    onChange={(e) => setFormAcao((p) => ({ ...p, what: e.target.value }))}
+                    placeholder="Descrição da ação"
+                    className={INPUT}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Como</label>
+                  <input
+                    type="text"
+                    value={formAcao.how}
+                    onChange={(e) => setFormAcao((p) => ({ ...p, how: e.target.value }))}
+                    placeholder="Como será realizada"
+                    className={INPUT}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Quem *</label>
+                  <input
+                    type="text"
+                    value={formAcao.who}
+                    onChange={(e) => setFormAcao((p) => ({ ...p, who: e.target.value }))}
+                    placeholder="Responsável"
+                    className={INPUT}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className={LABEL}>Quando *</label>
+                    <input
+                      type="date"
+                      value={formAcao.when_date}
+                      onChange={(e) => setFormAcao((p) => ({ ...p, when_date: e.target.value }))}
+                      className={INPUT}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className={LABEL}>Status *</label>
+                    <select
+                      value={formAcao.status}
+                      onChange={(e) => setFormAcao((p) => ({ ...p, status: e.target.value as CrisisActionStatus }))}
+                      className={INPUT}
+                    >
+                      <option value="PENDENTE">Pendente</option>
+                      <option value="EM_ANDAMENTO">Em andamento</option>
+                      <option value="CONCLUIDO">Concluído</option>
+                    </select>
+                  </div>
+                </div>
+                {erroAcao && <Alert status="error" message={erroAcao} />}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setModalAcao({ aberto: false, editandoAcao: null })}
+                  disabled={salvandoAcao}
+                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300 disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSalvarAcao}
+                  disabled={salvandoAcao}
+                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                >
+                  {salvandoAcao ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {editando && (
           <Card className="mt-4 p-6">

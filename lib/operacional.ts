@@ -61,6 +61,28 @@ export interface CriseItem {
   created_at: string;
 }
 
+export type CrisisActionStatus = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO";
+
+export interface CrisisAction {
+  id: string;
+  crise_id: string;
+  what: string;
+  how: string;
+  who: string;
+  when_date: string;
+  status: CrisisActionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CrisisActionPayload = {
+  what: string;
+  how: string;
+  who: string;
+  when_date: string;
+  status: CrisisActionStatus;
+};
+
 export interface ClientePerdidoLog {
   id: string;
   user_id: string;
@@ -541,5 +563,46 @@ export async function promoverCriseParaPerdido(
 
 export async function excluirCrise(id: string): Promise<void> {
   const { error } = await supabase.from("gestao_crise").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ── Crisis Actions ───────────────────────────────────────────
+
+export async function listarCrisisActions(criseId: string): Promise<CrisisAction[]> {
+  const { data, error } = await supabase
+    .from("crisis_actions")
+    .select("*")
+    .eq("crise_id", criseId)
+    .order("when_date", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CrisisAction[];
+}
+
+export async function criarCrisisAction(
+  criseId: string,
+  payload: CrisisActionPayload,
+): Promise<CrisisAction> {
+  const { data, error } = await supabase
+    .from("crisis_actions")
+    .insert({ ...payload, crise_id: criseId })
+    .select()
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar ação.");
+  return data as CrisisAction;
+}
+
+export async function editarCrisisAction(
+  id: string,
+  payload: CrisisActionPayload,
+): Promise<void> {
+  const { error } = await supabase
+    .from("crisis_actions")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function excluirCrisisAction(id: string): Promise<void> {
+  const { error } = await supabase.from("crisis_actions").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
