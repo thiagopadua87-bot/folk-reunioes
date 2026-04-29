@@ -388,8 +388,6 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   }
 
   const ativos = registros.filter((r) => !["fechado", "declinado"].includes(r.status));
-  const totalImplantacao = ativos.reduce((acc, r) => acc + r.valor_implantacao, 0);
-  const totalMensal      = ativos.reduce((acc, r) => acc + r.valor_mensal, 0);
 
   const statsPorTemp = {
     quente: ativos.filter((r) => r.temperatura === "quente"),
@@ -405,8 +403,10 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     return true;
   });
 
-  const propostasAtivas    = registrosExibidos.filter((r) => r.status !== "declinado");
+  const propostasAtivas     = registrosExibidos.filter((r) => !["fechado", "declinado"].includes(r.status));
   const propostasDeclinadas = registrosExibidos.filter((r) => r.status === "declinado");
+  const totalImplantacao    = propostasAtivas.reduce((acc, r) => acc + r.valor_implantacao, 0);
+  const totalMensal         = propostasAtivas.reduce((acc, r) => acc + r.valor_mensal, 0);
 
   // ── Formulário + Histórico ─────────────────────────────────
 
@@ -736,8 +736,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registrosExibidos.length} proposta${registrosExibidos.length !== 1 ? "s" : ""}`}</p>
-          {ativos.length > 0 && (
+          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${propostasAtivas.length} proposta${propostasAtivas.length !== 1 ? "s" : ""}${propostasDeclinadas.length > 0 ? ` · ${propostasDeclinadas.length} declinada${propostasDeclinadas.length !== 1 ? "s" : ""}` : ""}`}</p>
+          {propostasAtivas.length > 0 && (
             <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
               {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
               {totalImplantacao > 0 && totalMensal > 0 && <span className="text-gray-300">·</span>}
