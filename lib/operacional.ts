@@ -40,6 +40,7 @@ export interface ClientePerdido {
   valor_contrato: number;
   motivo_perda: MotivoPerda;
   observacoes: string;
+  winner_competitor_id: string | null;
   created_at: string;
 }
 
@@ -265,6 +266,7 @@ export interface FiltrosClientesPerdidos {
   dataInicio?: string;
   dataFim?: string;
   motivo?: MotivoPerda | "";
+  winnerCompetitorId?: string;
 }
 
 export async function listarClientesPerdidos(
@@ -275,9 +277,10 @@ export async function listarClientesPerdidos(
     .select("*")
     .order("data_encerramento", { ascending: false });
 
-  if (filtros?.dataInicio) q = q.gte("data_encerramento", filtros.dataInicio);
-  if (filtros?.dataFim)    q = q.lte("data_encerramento", filtros.dataFim);
-  if (filtros?.motivo)     q = q.eq("motivo_perda", filtros.motivo);
+  if (filtros?.dataInicio)          q = q.gte("data_encerramento", filtros.dataInicio);
+  if (filtros?.dataFim)             q = q.lte("data_encerramento", filtros.dataFim);
+  if (filtros?.motivo)              q = q.eq("motivo_perda", filtros.motivo);
+  if (filtros?.winnerCompetitorId)  q = q.eq("winner_competitor_id", filtros.winnerCompetitorId);
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);

@@ -405,6 +405,9 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     return true;
   });
 
+  const propostasAtivas    = registrosExibidos.filter((r) => r.status !== "declinado");
+  const propostasDeclinadas = registrosExibidos.filter((r) => r.status === "declinado");
+
   // ── Formulário + Histórico ─────────────────────────────────
 
   if (view === "form") {
@@ -507,13 +510,13 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             {form.status === "declinado" && (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <label className={LABEL}>Concorrente vencedor *</label>
+                  <label className={LABEL}>Concorrente vencedor</label>
                   <select
                     value={form.winner_competitor_id}
                     onChange={(e) => set("winner_competitor_id", e.target.value)}
                     className={INPUT}
                   >
-                    <option value="">Selecione...</option>
+                    <option value="">Sem concorrente / não identificado</option>
                     {allCompetitors.map((c) => (
                       <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
                     ))}
@@ -553,12 +556,12 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               <div className="border-b border-gray-100 px-6 py-4">
                 <h3 className="text-base font-bold text-gray-900">Registrar motivo da perda</h3>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  Informe o concorrente que venceu esta oportunidade.
+                  Informe o concorrente que venceu esta oportunidade, se houver.
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-4 px-6 py-5">
                 <div className="flex flex-col gap-1.5">
-                  <label className={LABEL}>Concorrente vencedor *</label>
+                  <label className={LABEL}>Concorrente vencedor</label>
                   <select
                     value={modalDeclinado.winner_competitor_id}
                     onChange={(e) =>
@@ -566,7 +569,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                     }
                     className={INPUT}
                   >
-                    <option value="">Selecione...</option>
+                    <option value="">Sem concorrente / não identificado</option>
                     {/* Linked competitors first */}
                     {allCompetitors
                       .filter((c) => competitorIds.includes(c.id))
@@ -608,10 +611,6 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 <button
                   type="button"
                   onClick={() => {
-                    if (!modalDeclinado.winner_competitor_id) {
-                      setModalDeclinado((p) => ({ ...p, erro: "Selecione o concorrente vencedor." }));
-                      return;
-                    }
                     setForm((p) => ({
                       ...p,
                       status: "declinado" as StatusPipeline,
@@ -759,71 +758,136 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
       {registrosExibidos.length > 0 && (
         <div className="flex flex-col gap-3">
-          {registrosExibidos.map((r) => (
-            <div key={r.id} className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${TEMP_BORDA[r.temperatura]}`}>
-              <div className="flex items-start justify-between gap-4 px-6 py-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900 break-words mb-1">{r.cliente}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TEMP_BADGE[r.temperatura]}`}>
-                      {labelTemperatura(r.temperatura)}
-                    </span>
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[r.status]}`}>
-                      {labelStatusPipeline(r.status)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                    {r.vendedor_nome && <><span>{r.vendedor_nome}</span><span>·</span></>}
-                    {r.indicado_por  && <><span>Indicado por {r.indicado_por}</span><span>·</span></>}
-                    <span>Lead desde {formatData(r.data_inicio_lead)}</span>
-                    {(r.valor_implantacao > 0 || r.valor_mensal > 0) && (
-                      <><span>·</span><span className="font-semibold text-gray-600">
-                        {r.valor_implantacao > 0 && r.valor_mensal > 0
-                          ? `${formatMoeda(r.valor_implantacao)} + ${formatMoeda(r.valor_mensal)}/mês`
-                          : r.valor_implantacao > 0
-                          ? formatMoeda(r.valor_implantacao)
-                          : `${formatMoeda(r.valor_mensal)}/mês`}
-                      </span></>
-                    )}
-                  </div>
-                  {r.servicos?.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {r.servicos.map((s) => (
-                        <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>
-                      ))}
-                    </div>
-                  )}
-                  {r.observacoes && <p className="mt-2 text-xs text-gray-400 italic">{r.observacoes}</p>}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-                    <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-                      {excluindo === r.id ? "..." : "Excluir"}
-                    </button>
-                  </div>
-                  {r.convertido_em_venda ? (
-                    <button
-                      onClick={onIrParaVendas}
-                      className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
-                    >
-                      ✓ Convertido — Ver vendas
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleConverter(r)}
-                      disabled={convertendo === r.id}
-                      className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
-                    >
-                      {convertendo === r.id ? "Abrindo..." : "→ Converter em venda"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+          {propostasAtivas.map((r) => (
+            <PropostaCard
+              key={r.id}
+              r={r}
+              allCompetitors={allCompetitors}
+              excluindo={excluindo}
+              convertendo={convertendo}
+              onEditar={abrirEditar}
+              onExcluir={handleExcluir}
+              onConverter={handleConverter}
+              onIrParaVendas={onIrParaVendas}
+            />
           ))}
+
+          {propostasDeclinadas.length > 0 && (
+            <>
+              {propostasAtivas.length > 0 && (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex-1 border-t border-dashed border-gray-200" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Propostas Declinadas</p>
+                  <div className="flex-1 border-t border-dashed border-gray-200" />
+                </div>
+              )}
+              {propostasDeclinadas.map((r) => (
+                <PropostaCard
+                  key={r.id}
+                  r={r}
+                  allCompetitors={allCompetitors}
+                  excluindo={excluindo}
+                  convertendo={convertendo}
+                  onEditar={abrirEditar}
+                  onExcluir={handleExcluir}
+                  onConverter={handleConverter}
+                  onIrParaVendas={onIrParaVendas}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PropostaCard({
+  r, allCompetitors, excluindo, convertendo,
+  onEditar, onExcluir, onConverter, onIrParaVendas,
+}: {
+  r: PipelineItem;
+  allCompetitors: Competitor[];
+  excluindo: string | null;
+  convertendo: string | null;
+  onEditar: (r: PipelineItem) => void;
+  onExcluir: (id: string) => void;
+  onConverter: (r: PipelineItem) => void;
+  onIrParaVendas: () => void;
+}) {
+  const winnerName = r.winner_competitor_id
+    ? (() => {
+        const c = allCompetitors.find((x) => x.id === r.winner_competitor_id);
+        return c ? (c.trade_name || c.legal_name) : null;
+      })()
+    : null;
+
+  return (
+    <div className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${TEMP_BORDA[r.temperatura]}`}>
+      <div className="flex items-start justify-between gap-4 px-6 py-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-gray-900 break-words mb-1">{r.cliente}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TEMP_BADGE[r.temperatura]}`}>
+              {labelTemperatura(r.temperatura)}
+            </span>
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[r.status]}`}>
+              {labelStatusPipeline(r.status)}
+            </span>
+            {winnerName && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                Vencedor: {winnerName}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+            {r.vendedor_nome && <><span>{r.vendedor_nome}</span><span>·</span></>}
+            {r.indicado_por  && <><span>Indicado por {r.indicado_por}</span><span>·</span></>}
+            <span>Lead desde {formatData(r.data_inicio_lead)}</span>
+            {(r.valor_implantacao > 0 || r.valor_mensal > 0) && (
+              <><span>·</span><span className="font-semibold text-gray-600">
+                {r.valor_implantacao > 0 && r.valor_mensal > 0
+                  ? `${formatMoeda(r.valor_implantacao)} + ${formatMoeda(r.valor_mensal)}/mês`
+                  : r.valor_implantacao > 0
+                  ? formatMoeda(r.valor_implantacao)
+                  : `${formatMoeda(r.valor_mensal)}/mês`}
+              </span></>
+            )}
+          </div>
+          {r.servicos?.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {r.servicos.map((s) => (
+                <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>
+              ))}
+            </div>
+          )}
+          {r.observacoes && <p className="mt-2 text-xs text-gray-400 italic">{r.observacoes}</p>}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={() => onEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
+            <button onClick={() => onExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+              {excluindo === r.id ? "..." : "Excluir"}
+            </button>
+          </div>
+          {r.convertido_em_venda ? (
+            <button
+              onClick={onIrParaVendas}
+              className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
+            >
+              ✓ Convertido — Ver vendas
+            </button>
+          ) : (
+            <button
+              onClick={() => onConverter(r)}
+              disabled={convertendo === r.id}
+              className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
+            >
+              {convertendo === r.id ? "Abrindo..." : "→ Converter em venda"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
