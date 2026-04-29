@@ -104,27 +104,109 @@ function CheckboxServicos({ value, onChange, disabled }: { value: string[]; onCh
 function SelectCompetitors({
   all, selected, onChange,
 }: { all: Competitor[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca]   = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickFora(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", onClickFora);
+    return () => document.removeEventListener("mousedown", onClickFora);
+  }, []);
+
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   }
+
+  const filtrados = all.filter((c) => {
+    const nome = (c.trade_name || c.legal_name).toLowerCase();
+    return nome.includes(busca.toLowerCase());
+  });
+
+  const label = (() => {
+    if (selected.length === 0) return "Selecionar concorrentes...";
+    const primeiro = all.find((c) => c.id === selected[0]);
+    const nome = primeiro ? (primeiro.trade_name || primeiro.legal_name) : "—";
+    return selected.length > 1 ? `${nome} +${selected.length - 1}` : nome;
+  })();
+
   if (all.length === 0)
     return <p className="text-xs text-gray-400">Nenhum concorrente cadastrado em Cadastros.</p>;
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {all.map((c) => {
-        const nome = c.trade_name || c.legal_name;
-        const checked = selected.includes(c.id);
-        return (
-          <button key={c.id} type="button" onClick={() => toggle(c.id)}
-            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-              checked
-                ? "border-folk bg-folk text-white"
-                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-folk/40 hover:text-folk"
-            }`}>
-            {nome}
-          </button>
-        );
-      })}
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => { setAberto((o) => !o); setBusca(""); }}
+        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors hover:border-folk/40 focus:border-folk focus:ring-2 focus:ring-folk/10"
+      >
+        <span className={selected.length === 0 ? "text-gray-400" : "text-gray-800"}>
+          {label}
+        </span>
+        <svg className={`h-4 w-4 text-gray-400 transition-transform ${aberto ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {aberto && (
+        <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
+          {/* Busca */}
+          <div className="border-b border-gray-100 px-3 py-2">
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar concorrente..."
+              autoFocus
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-1 focus:ring-folk/10"
+            />
+          </div>
+
+          {/* Lista */}
+          <ul className="max-h-52 overflow-y-auto py-1">
+            {filtrados.length === 0 && (
+              <li className="px-4 py-3 text-xs text-gray-400">Nenhum resultado.</li>
+            )}
+            {filtrados.map((c) => {
+              const nome = c.trade_name || c.legal_name;
+              const marcado = selected.includes(c.id);
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(c.id)}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 ${marcado ? "bg-folk/5" : ""}`}
+                  >
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                      marcado ? "border-folk bg-folk" : "border-gray-300 bg-white"
+                    }`}>
+                      {marcado && (
+                        <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className={marcado ? "font-medium text-gray-900" : "text-gray-700"}>
+                      {nome}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Rodapé */}
+          {selected.length > 0 && (
+            <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
+              {selected.length} selecionado{selected.length !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
