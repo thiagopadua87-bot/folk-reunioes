@@ -31,7 +31,6 @@ const STATUS_BADGE: Record<StatusPipeline, string> = {
   apresentacao:  "bg-gray-100 text-gray-600 border-gray-200",
   em_analise:    "bg-yellow-100 text-yellow-700 border-yellow-200",
   assinatura:    "bg-folk/10 text-folk border-folk/20",
-  fechado:       "bg-green-100 text-green-700 border-green-200",
   declinado:     "bg-red-100 text-red-500 border-red-200",
   fechado_ganho: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
@@ -387,7 +386,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     onConverter(item);
   }
 
-  const ativos = registros.filter((r) => !["fechado", "declinado"].includes(r.status));
+  const ativos = registros.filter((r) => !["fechado_ganho", "declinado"].includes(r.status));
 
   const statsPorTemp = {
     quente: ativos.filter((r) => r.temperatura === "quente"),
@@ -403,7 +402,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     return true;
   });
 
-  const propostasAtivas     = registrosExibidos.filter((r) => !["fechado", "declinado"].includes(r.status));
+  const propostasAtivas     = registrosExibidos.filter((r) => !["fechado_ganho", "declinado"].includes(r.status));
   const propostasDeclinadas = registrosExibidos.filter((r) => r.status === "declinado");
   const totalImplantacao    = propostasAtivas.reduce((acc, r) => acc + r.valor_implantacao, 0);
   const totalMensal         = propostasAtivas.reduce((acc, r) => acc + r.valor_mensal, 0);

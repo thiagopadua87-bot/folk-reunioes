@@ -194,7 +194,7 @@ export default function ComercialTVPage() {
   const totalEquipServicos    = vendas.reduce((s, v) => s + v.valor_implantacao, 0);
   const qtdEquipServicos      = vendas.filter((v) => v.valor_implantacao > 0).length;
 
-  const pipelineAtivos      = pipeline.filter((p) => !["fechado", "declinado", "fechado_ganho"].includes(p.status));
+  const pipelineAtivos      = pipeline.filter((p) => !["declinado", "fechado_ganho"].includes(p.status));
   const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
   const pipelineConvertidos = pipeline.filter((p) => p.status === "fechado_ganho").length;
 

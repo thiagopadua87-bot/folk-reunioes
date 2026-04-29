@@ -18,7 +18,6 @@ export const STATUS_PIPELINE = [
   { value: "apresentacao",  label: "Apresentação da empresa ou proposta" },
   { value: "em_analise",    label: "Em análise" },
   { value: "assinatura",    label: "Assinatura de Contrato" },
-  { value: "fechado",       label: "Fechado" },
   { value: "declinado",     label: "Declinado" },
   { value: "fechado_ganho", label: "Fechado (ganho)" },
 ] as const;
