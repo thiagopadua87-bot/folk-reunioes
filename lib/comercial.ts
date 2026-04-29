@@ -74,6 +74,8 @@ export interface PipelineItem {
   servicos: string[];
   convertido_em_venda: boolean;
   venda_id: string | null;
+  winner_competitor_id: string | null;
+  loss_reason: string;
   created_at: string;
 }
 
@@ -351,9 +353,10 @@ export async function listarPipeline(filtros?: FiltrosPipeline): Promise<Pipelin
   }));
 }
 
-export async function criarPipelineItem(payload: PipelinePayload): Promise<void> {
-  const { error } = await supabase.from("pipeline").insert(payload);
-  if (error) throw new Error(error.message);
+export async function criarPipelineItem(payload: PipelinePayload): Promise<string> {
+  const { data, error } = await supabase.from("pipeline").insert(payload).select("id").single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar proposta.");
+  return (data as { id: string }).id;
 }
 
 export async function editarPipelineItem(
@@ -372,6 +375,35 @@ export async function editarPipelineItem(
 export async function excluirPipelineItem(id: string): Promise<void> {
   const { error } = await supabase.from("pipeline").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// ── Opportunity Competitors ───────────────────────────────────
+
+export async function listarOpportunityCompetitors(opportunityId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("opportunity_competitors")
+    .select("competitor_id")
+    .eq("opportunity_id", opportunityId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: { competitor_id: string }) => r.competitor_id);
+}
+
+export async function sincronizarOpportunityCompetitors(
+  opportunityId: string,
+  competitorIds: string[],
+): Promise<void> {
+  const { error: errDel } = await supabase
+    .from("opportunity_competitors")
+    .delete()
+    .eq("opportunity_id", opportunityId);
+  if (errDel) throw new Error(errDel.message);
+
+  if (competitorIds.length > 0) {
+    const { error: errIns } = await supabase
+      .from("opportunity_competitors")
+      .insert(competitorIds.map((cid) => ({ opportunity_id: opportunityId, competitor_id: cid })));
+    if (errIns) throw new Error(errIns.message);
+  }
 }
 
 // ── Pipeline Logs ─────────────────────────────────────────────

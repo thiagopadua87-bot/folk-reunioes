@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   listarPipeline, criarPipelineItem, editarPipelineItem, excluirPipelineItem,
-  listarLogs,
+  listarLogs, listarOpportunityCompetitors, sincronizarOpportunityCompetitors,
   TEMPERATURAS, STATUS_PIPELINE, SERVICOS_COMERCIAL,
   labelTemperatura, labelStatusPipeline, formatMoeda, formatData,
   type PipelineItem, type PipelinePayload, type PipelineLog,
   type Temperatura, type StatusPipeline, type FiltrosPipeline,
 } from "@/lib/comercial";
-import { listarVendedores, type Vendedor } from "@/lib/cadastros";
+import { listarVendedores, listarCompetitors, type Vendedor, type Competitor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
@@ -101,6 +101,34 @@ function CheckboxServicos({ value, onChange, disabled }: { value: string[]; onCh
   );
 }
 
+function SelectCompetitors({
+  all, selected, onChange,
+}: { all: Competitor[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+  if (all.length === 0)
+    return <p className="text-xs text-gray-400">Nenhum concorrente cadastrado em Cadastros.</p>;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {all.map((c) => {
+        const nome = c.trade_name || c.legal_name;
+        const checked = selected.includes(c.id);
+        return (
+          <button key={c.id} type="button" onClick={() => toggle(c.id)}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              checked
+                ? "border-folk bg-folk text-white"
+                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-folk/40 hover:text-folk"
+            }`}>
+            {nome}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface FormState {
   data_inicio_lead: string;
   vendedor_id: string;
@@ -112,12 +140,15 @@ interface FormState {
   servicos: string[];
   indicado_por: string;
   observacoes: string;
+  winner_competitor_id: string;
+  loss_reason: string;
 }
 
 const FORM_VAZIO: FormState = {
   data_inicio_lead: "", vendedor_id: "", cliente: "",
   temperatura: "morna", valor_implantacao: "", valor_mensal: "", status: "apresentacao",
   servicos: [], indicado_por: "", observacoes: "",
+  winner_competitor_id: "", loss_reason: "",
 };
 
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
@@ -146,6 +177,11 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [buscaCliente, setBuscaCliente] = useState("");
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
+  const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
+  const [competitorIds, setCompetitorIds]   = useState<string[]>([]);
+  const [modalDeclinado, setModalDeclinado] = useState<{
+    aberto: boolean; winner_competitor_id: string; loss_reason: string; erro: string | null;
+  }>({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null });
 
   const logsVisiveis = useMemo(() => {
     const conversaoLog = logs.find((l) => l.campo === "conversao");
@@ -163,13 +199,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
-      const [lista, vends] = await Promise.all([
+      const [lista, vends, comps] = await Promise.all([
         listarPipeline(),
         listarVendedores({ ativo: true }),
+        listarCompetitors({ status: "ativo" }),
       ]);
       if (reqId !== reqIdRef.current) return;
       setRegistros(lista);
       setVendedores(vends);
+      setAllCompetitors(comps);
     } catch (e) {
       if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
@@ -190,14 +228,28 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
   function abrirNovo() {
-    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]);
+    setCompetitorIds([]); markClean(); setView("form");
   }
   function abrirEditar(r: PipelineItem) {
     setEditando(r);
-    setForm({ data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "", cliente: r.cliente, temperatura: r.temperatura, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por, observacoes: r.observacoes });
-    setErroForm(null); markClean(); setView("form"); carregarLogs(r.id);
+    setForm({
+      data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "",
+      cliente: r.cliente, temperatura: r.temperatura,
+      valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal),
+      status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por,
+      observacoes: r.observacoes,
+      winner_competitor_id: r.winner_competitor_id ?? "",
+      loss_reason: r.loss_reason ?? "",
+    });
+    setCompetitorIds([]);
+    setErroForm(null); markClean(); setView("form");
+    carregarLogs(r.id);
+    listarOpportunityCompetitors(r.id).then(setCompetitorIds).catch(() => {});
   }
-  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function cancelar() {
+    guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); setCompetitorIds([]); });
+  }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -216,19 +268,25 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
         servicos:          form.servicos,
         indicado_por:      form.indicado_por.trim(),
         observacoes:       form.observacoes.trim(),
+        winner_competitor_id: form.winner_competitor_id || null,
+        loss_reason:          form.loss_reason.trim(),
       };
-      const idEditado = editando?.id ?? null;
-      if (editando) await editarPipelineItem(editando.id, payload, editando, vendedores);
-      else           await criarPipelineItem(payload);
+      let savedId: string;
+      if (editando) {
+        await editarPipelineItem(editando.id, payload, editando, vendedores);
+        savedId = editando.id;
+      } else {
+        savedId = await criarPipelineItem(payload);
+      }
+      await sincronizarOpportunityCompetitors(savedId, competitorIds);
       markClean();
       await carregar();
-      // Se estava editando, recarrega logs e permanece na tela
-      if (idEditado) {
+      if (editando) {
         setEditando((prev) => prev ? { ...prev, ...payload, vendedor_nome: vendedores.find(v => v.id === payload.vendedor_id)?.nome ?? null } : null);
-        setTimeout(() => carregarLogs(idEditado), 400);
+        setTimeout(() => carregarLogs(savedId), 400);
         setErroForm(null);
       } else {
-        setView("list"); setEditando(null); setLogs([]);
+        setView("list"); setEditando(null); setLogs([]); setCompetitorIds([]);
       }
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -292,7 +350,22 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Status</label>
-              <select value={form.status} onChange={(e) => set("status", e.target.value as StatusPipeline)} className={INPUT}>
+              <select
+                value={form.status}
+                onChange={(e) => {
+                  const val = e.target.value as StatusPipeline;
+                  if (val === "declinado" && form.status !== "declinado") {
+                    setModalDeclinado({ aberto: true, winner_competitor_id: "", loss_reason: "", erro: null });
+                  } else {
+                    set("status", val);
+                    if (val !== "declinado") {
+                      setForm((p) => ({ ...p, status: val, winner_competitor_id: "", loss_reason: "" }));
+                      markDirty();
+                    }
+                  }
+                }}
+                className={INPUT}
+              >
                 {STATUS_PIPELINE.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
@@ -339,6 +412,44 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               <CheckboxServicos value={form.servicos} onChange={(v) => set("servicos", v)} disabled={!!editando?.convertido_em_venda} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <label className={LABEL}>Concorrentes envolvidos</label>
+              <SelectCompetitors
+                all={allCompetitors}
+                selected={competitorIds}
+                onChange={(ids) => { setCompetitorIds(ids); markDirty(); }}
+              />
+            </div>
+
+            {/* Motivo de perda — visível só quando declinado */}
+            {form.status === "declinado" && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Concorrente vencedor *</label>
+                  <select
+                    value={form.winner_competitor_id}
+                    onChange={(e) => set("winner_competitor_id", e.target.value)}
+                    className={INPUT}
+                  >
+                    <option value="">Selecione...</option>
+                    {allCompetitors.map((c) => (
+                      <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Motivo da perda</label>
+                  <input
+                    type="text"
+                    value={form.loss_reason}
+                    onChange={(e) => set("loss_reason", e.target.value)}
+                    placeholder="Breve descrição do motivo"
+                    className={INPUT}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Observações</label>
               <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3} placeholder="Informações adicionais sobre a proposta..." className={`${INPUT} resize-none`} />
@@ -352,6 +463,90 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
           </form>
         </Card>
+
+        {/* ── Modal: Registrar motivo da perda ── */}
+        {modalDeclinado.aberto && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h3 className="text-base font-bold text-gray-900">Registrar motivo da perda</h3>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Informe o concorrente que venceu esta oportunidade.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 px-6 py-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Concorrente vencedor *</label>
+                  <select
+                    value={modalDeclinado.winner_competitor_id}
+                    onChange={(e) =>
+                      setModalDeclinado((p) => ({ ...p, winner_competitor_id: e.target.value, erro: null }))
+                    }
+                    className={INPUT}
+                  >
+                    <option value="">Selecione...</option>
+                    {/* Linked competitors first */}
+                    {allCompetitors
+                      .filter((c) => competitorIds.includes(c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                      ))}
+                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).length > 0 && (
+                      <option disabled>──────────</option>
+                    )}
+                    {allCompetitors
+                      .filter((c) => !competitorIds.includes(c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                      ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Observação</label>
+                  <input
+                    type="text"
+                    value={modalDeclinado.loss_reason}
+                    onChange={(e) =>
+                      setModalDeclinado((p) => ({ ...p, loss_reason: e.target.value }))
+                    }
+                    placeholder="Motivo, preço, relacionamento..."
+                    className={INPUT}
+                  />
+                </div>
+                {modalDeclinado.erro && <Alert status="error" message={modalDeclinado.erro} />}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setModalDeclinado({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null })}
+                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!modalDeclinado.winner_competitor_id) {
+                      setModalDeclinado((p) => ({ ...p, erro: "Selecione o concorrente vencedor." }));
+                      return;
+                    }
+                    setForm((p) => ({
+                      ...p,
+                      status: "declinado" as StatusPipeline,
+                      winner_competitor_id: modalDeclinado.winner_competitor_id,
+                      loss_reason: modalDeclinado.loss_reason,
+                    }));
+                    markDirty();
+                    setModalDeclinado({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null });
+                  }}
+                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Histórico — só aparece na edição */}
         {editando && (

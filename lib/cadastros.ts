@@ -146,3 +146,49 @@ export async function editarTerceirizado(id: string, payload: TerceirizadoPayloa
   const { error } = await supabase.from("terceirizados").update(payload).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// ── Concorrentes ─────────────────────────────────────────────
+
+export interface Competitor {
+  id: string;
+  user_id: string;
+  cnpj: string;
+  legal_name: string;
+  trade_name: string;
+  status: "ativo" | "inativo";
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompetitorPayload = Omit<Competitor, "id" | "user_id" | "created_at" | "updated_at">;
+
+export interface FiltrosCompetitors { busca?: string; status?: "ativo" | "inativo" | "" }
+
+export async function listarCompetitors(filtros?: FiltrosCompetitors): Promise<Competitor[]> {
+  let q = supabase.from("competitors").select("*").order("legal_name");
+  if (filtros?.status) q = q.eq("status", filtros.status);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const lista = (data ?? []) as Competitor[];
+  if (filtros?.busca) {
+    const b = filtros.busca.toLowerCase();
+    return lista.filter(
+      (c) => c.legal_name.toLowerCase().includes(b) || c.trade_name.toLowerCase().includes(b),
+    );
+  }
+  return lista;
+}
+
+export async function criarCompetitor(payload: CompetitorPayload): Promise<Competitor> {
+  const { data, error } = await supabase.from("competitors").insert(payload).select().single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar concorrente.");
+  return data as Competitor;
+}
+
+export async function editarCompetitor(id: string, payload: CompetitorPayload): Promise<void> {
+  const { error } = await supabase
+    .from("competitors")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}

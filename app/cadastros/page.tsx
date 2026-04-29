@@ -4,14 +4,16 @@ import { useState } from "react";
 import VendedoresTab from "./VendedoresTab";
 import TecnicosTab from "./TecnicosTab";
 import TerceirizadosTab from "./TerceirizadosTab";
+import CompetitoresTab from "./CompetitoresTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
-type Aba = "vendedores" | "tecnicos" | "terceirizados";
+type Aba = "vendedores" | "tecnicos" | "terceirizados" | "concorrentes";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
   { value: "vendedores",    label: "Vendedores",    descricao: "Equipe comercial responsável pelas vendas" },
   { value: "tecnicos",      label: "Técnicos",      descricao: "Técnicos internos para execução de obras e serviços" },
   { value: "terceirizados", label: "Terceirizados", descricao: "Empresas e parceiros terceirizados" },
+  { value: "concorrentes",  label: "Concorrentes",  descricao: "Empresas concorrentes presentes nas oportunidades" },
 ];
 
 export default function CadastrosPage() {
@@ -44,6 +46,7 @@ export default function CadastrosPage() {
       {aba === "vendedores"    && <VendedoresTab />}
       {aba === "tecnicos"      && <TecnicosTab />}
       {aba === "terceirizados" && <TerceirizadosTab />}
+      {aba === "concorrentes"  && <CompetitoresTab />}
     </main>
   );
 }
