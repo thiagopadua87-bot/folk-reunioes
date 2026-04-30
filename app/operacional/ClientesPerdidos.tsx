@@ -524,7 +524,6 @@ export default function ClientesPerdidos({
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Encerramento</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">CNPJ</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de serviço</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo</th>
@@ -546,7 +545,12 @@ export default function ClientesPerdidos({
                 >
                   <td className="py-3.5 pl-6 pr-4 text-sm text-gray-700">{formatData(r.data_encerramento)}</td>
                   <td className="py-3.5 pr-4">
-                    <p className="text-sm font-medium text-gray-900">{r.cliente}</p>
+                    <p
+                      className="text-sm font-medium text-gray-900"
+                      title={r.cnpj ? formatarCNPJ(r.cnpj) : undefined}
+                    >
+                      {r.cliente}
+                    </p>
                     {r.crise_id && (
                       <button
                         onClick={() => abrirHistorico(r)}
@@ -555,9 +559,6 @@ export default function ClientesPerdidos({
                         Vindo da Gestão de Crise ↗
                       </button>
                     )}
-                  </td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-400">
-                    {r.cnpj ? formatarCNPJ(r.cnpj) : "—"}
                   </td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{labelTipoServico(r.tipo_servico)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-700">{formatMoeda(r.valor_contrato)}</td>
