@@ -143,15 +143,15 @@ export default function AdminPanel({ profiles }: AdminPanelProps) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-8 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
         {filtros.map(({ value, label }) => (
           <button
             key={value}
             onClick={() => setFiltro(value)}
-            className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors ${
+            className={`rounded-xl px-5 py-2 text-sm font-semibold transition-colors ${
               filtro === value
-                ? "border-folk bg-folk text-white"
-                : "border-gray-200 bg-white text-gray-600 hover:border-folk/40 hover:text-folk"
+                ? "bg-folk text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
             }`}
           >
             {label}
