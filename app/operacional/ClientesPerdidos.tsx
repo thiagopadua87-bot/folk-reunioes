@@ -10,7 +10,7 @@ import {
   type ClientePerdido, type EventoHistorico, type TipoServico, type MotivoPerda,
   type FiltrosClientesPerdidos,
 } from "@/lib/operacional";
-import { listarCompetitors, type Competitor } from "@/lib/cadastros";
+import { listarCompetitors, formatarCNPJ, type Competitor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { supabase } from "@/lib/supabase";
@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 // ── Tipos de formulário ──────────────────────────────────────
 
 interface FormState {
+  cnpj: string;
   data_aviso: string;
   data_encerramento: string;
   cliente: string;
@@ -29,6 +30,7 @@ interface FormState {
 }
 
 const FORM_VAZIO: FormState = {
+  cnpj: "",
   data_aviso: "",
   data_encerramento: "",
   cliente: "",
@@ -45,6 +47,7 @@ function formParaPayload(
 ): Omit<ClientePerdido, "id" | "user_id" | "created_at"> {
   return {
     crise_id: existingRecord?.crise_id ?? null,
+    cnpj: f.cnpj.replace(/\D/g, ""),
     data_aviso: f.data_aviso,
     data_encerramento: f.data_encerramento,
     cliente: f.cliente.trim(),
@@ -58,6 +61,7 @@ function formParaPayload(
 
 function registroParaForm(r: ClientePerdido): FormState {
   return {
+    cnpj: r.cnpj ?? "",
     data_aviso: r.data_aviso,
     data_encerramento: r.data_encerramento,
     cliente: r.cliente,
@@ -99,8 +103,10 @@ export default function ClientesPerdidos({
   focoRegistroId,
   onFocoConsumido,
 }: ClientesPerdidosProps = {}) {
-  const [registros, setRegistros]         = useState<ClientePerdido[]>([]);
+  const [registros, setRegistros]           = useState<ClientePerdido[]>([]);
   const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
+  const [buscandoCNPJ, setBuscandoCNPJ]     = useState(false);
+  const [cnpjAviso, setCnpjAviso]           = useState<string | null>(null);
   const [carregando, setCarregando]       = useState(true);
   const [erro, setErro]                   = useState<string | null>(null);
   const [isAdmin, setIsAdmin]             = useState(false);
@@ -197,16 +203,36 @@ export default function ClientesPerdidos({
     }
   }
 
+  async function buscarCNPJ(cnpjRaw: string) {
+    const digits = cnpjRaw.replace(/\D/g, "");
+    if (digits.length !== 14) return;
+    setBuscandoCNPJ(true); setCnpjAviso(null);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+      if (!res.ok) { setCnpjAviso("CNPJ não encontrado. Preencha os dados manualmente."); return; }
+      const json = await res.json();
+      const razao = (json.razao_social as string | undefined)?.trim() ?? "";
+      const fantasia = (json.nome_fantasia as string | undefined)?.trim() ?? "";
+      setForm((p) => ({ ...p, cliente: razao || p.cliente }));
+      if (fantasia) setCnpjAviso(`Nome Fantasia: ${fantasia}`);
+      markDirty();
+    } catch {
+      setCnpjAviso("CNPJ não encontrado. Preencha os dados manualmente.");
+    } finally {
+      setBuscandoCNPJ(false);
+    }
+  }
+
   function abrirFormNovo() {
-    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form");
+    setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); setCnpjAviso(null); markClean(); setView("form");
   }
 
   function abrirFormEditar(r: ClientePerdido) {
-    setEditando(r); setForm(registroParaForm(r)); setErroForm(null); markClean(); setView("form");
+    setEditando(r); setForm(registroParaForm(r)); setErroForm(null); setCnpjAviso(null); markClean(); setView("form");
     carregarLogsForm(r.id);
   }
 
-  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); setCnpjAviso(null); }); }
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((prev) => ({ ...prev, [k]: v })); markDirty();
@@ -282,6 +308,27 @@ export default function ClientesPerdidos({
 
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {/* CNPJ com lookup automático */}
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className={LABEL}>
+                CNPJ
+                {buscandoCNPJ && <span className="ml-2 font-normal normal-case text-gray-400">Buscando...</span>}
+              </label>
+              <input
+                type="text"
+                value={formatarCNPJ(form.cnpj)}
+                onChange={(e) => set("cnpj", e.target.value)}
+                onBlur={(e) => buscarCNPJ(e.target.value)}
+                placeholder="00.000.000/0000-00"
+                className={INPUT}
+              />
+              {cnpjAviso && (
+                <p className={`text-[11px] ${cnpjAviso.startsWith("Nome") ? "text-gray-500" : "text-amber-600"}`}>
+                  {cnpjAviso}
+                </p>
+              )}
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Data do aviso *</label>
               <input type="date" value={form.data_aviso} onChange={(e) => set("data_aviso", e.target.value)} required className={INPUT} />
@@ -293,7 +340,7 @@ export default function ClientesPerdidos({
             </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className={LABEL}>Cliente *</label>
+              <label className={LABEL}>Cliente (Razão Social) *</label>
               <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente" className={INPUT} />
             </div>
 
@@ -477,6 +524,7 @@ export default function ClientesPerdidos({
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Encerramento</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Cliente</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">CNPJ</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de serviço</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo</th>
@@ -507,6 +555,9 @@ export default function ClientesPerdidos({
                         Vindo da Gestão de Crise ↗
                       </button>
                     )}
+                  </td>
+                  <td className="py-3.5 pr-4 text-sm text-gray-400">
+                    {r.cnpj ? formatarCNPJ(r.cnpj) : "—"}
                   </td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{labelTipoServico(r.tipo_servico)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-700">{formatMoeda(r.valor_contrato)}</td>

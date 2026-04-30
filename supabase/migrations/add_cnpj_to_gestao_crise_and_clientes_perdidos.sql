@@ -1,0 +1,2 @@
+ALTER TABLE public.gestao_crise       ADD COLUMN IF NOT EXISTS cnpj TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.clientes_perdidos  ADD COLUMN IF NOT EXISTS cnpj TEXT NOT NULL DEFAULT '';

@@ -36,6 +36,7 @@ export interface ClientePerdido {
   data_aviso: string;
   data_encerramento: string;
   cliente: string;
+  cnpj: string;
   tipo_servico: TipoServico;
   valor_contrato: number;
   motivo_perda: MotivoPerda;
@@ -48,6 +49,7 @@ export interface CriseItem {
   id: string;
   user_id: string;
   cliente: string;
+  cnpj: string;
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
@@ -360,6 +362,7 @@ const PESO_RISCO: Record<NivelRisco, number> = { alto: 0, medio: 1, baixo: 2, re
 
 export type CriseEditPayload = {
   cliente: string;
+  cnpj: string;
   tipo_servico: TipoServico;
   risco: NivelRisco;
   acoes: string;
@@ -531,6 +534,7 @@ export async function promoverCriseParaPerdido(
     .insert({
       crise_id: crise.id,
       cliente: crise.cliente,
+      cnpj: crise.cnpj ?? "",
       tipo_servico: crise.tipo_servico,
       ...payload,
     })

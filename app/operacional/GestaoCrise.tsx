@@ -14,6 +14,7 @@ import {
   type CriseEditPayload,
   type CrisisAction, type CrisisActionStatus, type CrisisActionPayload,
 } from "@/lib/operacional";
+import { formatarCNPJ } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
@@ -61,6 +62,7 @@ function formatLogTs(s: string): string {
 // ── Tipos de formulário ──────────────────────────────────────
 
 interface FormState {
+  cnpj: string;
   cliente: string;
   tipo_servico: TipoServico;
   risco: NivelRisco;
@@ -71,6 +73,7 @@ interface FormState {
 }
 
 const FORM_VAZIO: FormState = {
+  cnpj: "",
   cliente: "",
   tipo_servico: "portaria_remota",
   risco: "medio",
@@ -163,6 +166,9 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
   const [erroAcao, setErroAcao]                       = useState<string | null>(null);
   const [excluindoAcao, setExcluindoAcao]             = useState<string | null>(null);
   const [confirmacaoExcluirAcaoId, setConfirmacaoExcluirAcaoId] = useState<string | null>(null);
+
+  const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
+  const [cnpjAviso, setCnpjAviso]       = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -262,14 +268,38 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
     }
   }
 
+  async function buscarCNPJ(cnpjRaw: string) {
+    const digits = cnpjRaw.replace(/\D/g, "");
+    if (digits.length !== 14) return;
+    setBuscandoCNPJ(true); setCnpjAviso(null);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+      if (!res.ok) { setCnpjAviso("CNPJ não encontrado. Preencha os dados manualmente."); return; }
+      const json = await res.json();
+      const razao = (json.razao_social as string | undefined)?.trim() ?? "";
+      const fantasia = (json.nome_fantasia as string | undefined)?.trim() ?? "";
+      setForm((p) => ({
+        ...p,
+        cliente: razao || p.cliente,
+      }));
+      if (fantasia) setCnpjAviso(`Nome Fantasia: ${fantasia}`);
+      markDirty();
+    } catch {
+      setCnpjAviso("CNPJ não encontrado. Preencha os dados manualmente.");
+    } finally {
+      setBuscandoCNPJ(false);
+    }
+  }
+
   function abrirFormNovo() {
     setEditando(null); setForm(FORM_VAZIO); setArquivoNovo(null);
-    setErroForm(null); setLogs([]); markClean(); setView("form");
+    setErroForm(null); setLogs([]); setCnpjAviso(null); markClean(); setView("form");
   }
 
   function abrirFormEditar(c: CriseItem) {
     setEditando(c);
     setForm({
+      cnpj: c.cnpj ?? "",
       cliente: c.cliente,
       tipo_servico: c.tipo_servico,
       risco: c.risco,
@@ -290,7 +320,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
   function cancelar() {
     guardCancel(() => {
       setView("list"); setEditando(null); setErroForm(null);
-      setLogs([]); setArquivoNovo(null); setCrisisActions([]);
+      setLogs([]); setArquivoNovo(null); setCrisisActions([]); setCnpjAviso(null);
     });
   }
 
@@ -305,6 +335,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
     setErroForm(null);
     try {
       const payload: CriseEditPayload = {
+        cnpj: form.cnpj.replace(/\D/g, ""),
         cliente: form.cliente.trim(),
         tipo_servico: form.tipo_servico,
         risco: form.risco,
@@ -442,8 +473,29 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
 
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {/* CNPJ com lookup automático */}
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className={LABEL}>Cliente *</label>
+              <label className={LABEL}>
+                CNPJ
+                {buscandoCNPJ && <span className="ml-2 font-normal normal-case text-gray-400">Buscando...</span>}
+              </label>
+              <input
+                type="text"
+                value={formatarCNPJ(form.cnpj)}
+                onChange={(e) => set("cnpj", e.target.value)}
+                onBlur={(e) => buscarCNPJ(e.target.value)}
+                placeholder="00.000.000/0000-00"
+                className={INPUT}
+              />
+              {cnpjAviso && (
+                <p className={`text-[11px] ${cnpjAviso.startsWith("Nome") ? "text-gray-500" : "text-amber-600"}`}>
+                  {cnpjAviso}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className={LABEL}>Cliente (Razão Social) *</label>
               <input
                 type="text" value={form.cliente}
                 onChange={(e) => set("cliente", e.target.value)}
@@ -991,6 +1043,9 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                       {labelTipoServico(c.tipo_servico)}
                       {c.valor_contrato > 0 && (
                         <span className="ml-2 font-semibold text-gray-600">{formatMoeda(c.valor_contrato)}</span>
+                      )}
+                      {c.cnpj && (
+                        <span className="ml-2">{formatarCNPJ(c.cnpj)}</span>
                       )}
                     </p>
 
