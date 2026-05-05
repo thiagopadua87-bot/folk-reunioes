@@ -129,6 +129,7 @@ export default function ClientesPerdidos({
   const [filtros, setFiltros] = useState<FiltrosClientesPerdidos>({
     dataInicio: "", dataFim: "", motivo: "", winnerCompetitorId: "",
   });
+  const [quarterSelecionado, setQuarterSelecionado] = useState<1 | 2 | 3 | 4 | null>(null);
 
   const kpiTrimestres = useMemo(() => {
     const t1: ClientePerdido[] = [], t2: ClientePerdido[] = [], t3: ClientePerdido[] = [], t4: ClientePerdido[] = [];
@@ -151,6 +152,23 @@ export default function ClientesPerdidos({
     }
     checkAdmin();
   }, []);
+
+  function getQuarterDateRange(q: 1 | 2 | 3 | 4, year: number): { inicio: string; fim: string } {
+    const ranges: Record<1 | 2 | 3 | 4, { inicio: string; fim: string }> = {
+      1: { inicio: `${year}-01-01`, fim: `${year}-03-31` },
+      2: { inicio: `${year}-04-01`, fim: `${year}-06-30` },
+      3: { inicio: `${year}-07-01`, fim: `${year}-09-30` },
+      4: { inicio: `${year}-10-01`, fim: `${year}-12-31` },
+    };
+    return ranges[q];
+  }
+
+  function handleQuarterClick(q: 1 | 2 | 3 | 4) {
+    const year = new Date().getFullYear();
+    const { inicio, fim } = getQuarterDateRange(q, year);
+    setQuarterSelecionado(q);
+    setFiltros((f) => ({ ...f, dataInicio: inicio, dataFim: fim }));
+  }
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -442,11 +460,11 @@ export default function ClientesPerdidos({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Data encerramento — de</label>
-            <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltros((f) => ({ ...f, dataInicio: e.target.value }))} className={INPUT} />
+            <input type="date" value={filtros.dataInicio} onChange={(e) => { setQuarterSelecionado(null); setFiltros((f) => ({ ...f, dataInicio: e.target.value })); }} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Data encerramento — até</label>
-            <input type="date" value={filtros.dataFim} onChange={(e) => setFiltros((f) => ({ ...f, dataFim: e.target.value }))} className={INPUT} />
+            <input type="date" value={filtros.dataFim} onChange={(e) => { setQuarterSelecionado(null); setFiltros((f) => ({ ...f, dataFim: e.target.value })); }} className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Motivo da perda</label>
@@ -489,25 +507,51 @@ export default function ClientesPerdidos({
       {!carregando && registros.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {([
-            { label: "T1", sub: "Jan–Mar", items: kpiTrimestres.t1, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
-            { label: "T2", sub: "Abr–Jun", items: kpiTrimestres.t2, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
-            { label: "T3", sub: "Jul–Set", items: kpiTrimestres.t3, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
-            { label: "T4", sub: "Out–Dez", items: kpiTrimestres.t4, cls: "border-gray-200 bg-gray-50", txt: "text-gray-700" },
-            { label: "Total", sub: "",     items: registros,         cls: "border-folk/20 bg-folk/5",   txt: "text-folk-dark" },
-          ] as const).map(({ label, sub, items, cls, txt }) => (
-            <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
-              <div className="mb-1">
-                <p className={`text-xs font-semibold uppercase tracking-wide ${txt}`}>{label}</p>
-                {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
+            { label: "T1", sub: "Jan–Mar", q: 1 as const, items: kpiTrimestres.t1 },
+            { label: "T2", sub: "Abr–Jun", q: 2 as const, items: kpiTrimestres.t2 },
+            { label: "T3", sub: "Jul–Set", q: 3 as const, items: kpiTrimestres.t3 },
+            { label: "T4", sub: "Out–Dez", q: 4 as const, items: kpiTrimestres.t4 },
+            { label: "Total", sub: "",     q: null,        items: registros },
+          ]).map(({ label, sub, q, items }) => {
+            const isSelected = q !== null && quarterSelecionado === q;
+            const isTotal = q === null;
+            return isTotal ? (
+              <div key={label} className="rounded-2xl border border-folk/20 bg-folk/5 px-4 py-3">
+                <div className="mb-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-folk-dark">{label}</p>
+                </div>
+                <p className="text-2xl font-bold text-folk-dark">{items.length}</p>
+                {items.reduce((s, r) => s + r.valor_contrato, 0) > 0 && (
+                  <p className="text-xs font-medium text-folk-dark mt-0.5 opacity-80">
+                    {formatMoeda(items.reduce((s, r) => s + r.valor_contrato, 0))}
+                  </p>
+                )}
               </div>
-              <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
-              {items.reduce((s, r) => s + r.valor_contrato, 0) > 0 && (
-                <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
-                  {formatMoeda(items.reduce((s, r) => s + r.valor_contrato, 0))}
-                </p>
-              )}
-            </div>
-          ))}
+            ) : (
+              <button
+                key={label}
+                type="button"
+                onClick={() => handleQuarterClick(q)}
+                className={[
+                  "rounded-2xl border px-4 py-3 text-left transition-all",
+                  isSelected
+                    ? "border-folk bg-folk/10 shadow-sm ring-1 ring-folk/30"
+                    : "border-gray-200 bg-gray-50 hover:border-folk/40 hover:bg-folk/5",
+                ].join(" ")}
+              >
+                <div className="mb-1">
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? "text-folk" : "text-gray-700"}`}>{label}</p>
+                  {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
+                </div>
+                <p className={`text-2xl font-bold ${isSelected ? "text-folk" : "text-gray-700"}`}>{items.length}</p>
+                {items.reduce((s, r) => s + r.valor_contrato, 0) > 0 && (
+                  <p className={`text-xs font-medium mt-0.5 opacity-80 ${isSelected ? "text-folk" : "text-gray-700"}`}>
+                    {formatMoeda(items.reduce((s, r) => s + r.valor_contrato, 0))}
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
