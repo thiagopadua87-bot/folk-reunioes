@@ -71,7 +71,7 @@ function CheckboxServicos({ value, onChange }: { value: string[]; onChange: (v: 
 }
 
 function BarraAndamento({ valor }: { valor: number }) {
-  const cor = valor === 100 ? "bg-green-500" : valor >= 60 ? "bg-folk" : valor >= 40 ? "bg-amber-400" : "bg-gray-300";
+  const cor = valor === 100 ? "bg-green-500" : valor >= 60 ? "bg-folk" : valor >= 30 ? "bg-amber-400" : "bg-gray-300";
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-100">

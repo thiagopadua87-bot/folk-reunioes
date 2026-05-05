@@ -26,7 +26,7 @@ export const EQUIPES = [
   { value: "terceiro",       label: "Terceiro" },
 ] as const;
 
-export const ANDAMENTOS = [0, 20, 40, 60, 80, 100] as const;
+export const ANDAMENTOS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 
 export type TipoProjeto    = (typeof TIPOS_PROJETO)[number]["value"];
 export type SituacaoProjeto = (typeof SITUACOES_PROJETO)[number]["value"];
