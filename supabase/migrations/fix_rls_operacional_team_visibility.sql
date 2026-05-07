@@ -1,33 +1,40 @@
--- Corrige visibilidade de Gestão de Crise e Clientes Perdidos para todos os usuários aprovados.
--- Antes: cada usuário só via seus próprios registros.
--- Depois: qualquer usuário aprovado lê tudo; escrita restrita a criador ou admin.
+-- Corrige visibilidade e edição de Gestão de Crise e Clientes Perdidos para todos os usuários aprovados.
+-- Qualquer usuário aprovado pode ler, criar e editar. Exclusão restrita a criador ou admin (reforçada no app).
 
 -- ── Gestão de Crise ──────────────────────────────────────────
 DROP POLICY IF EXISTS "Acesso a gestao_crise" ON public.gestao_crise;
+DROP POLICY IF EXISTS "Leitura de gestao_crise" ON public.gestao_crise;
+DROP POLICY IF EXISTS "Escrita de gestao_crise" ON public.gestao_crise;
 
-CREATE POLICY "Leitura de gestao_crise" ON public.gestao_crise
-  FOR SELECT USING (
+CREATE POLICY "Acesso a gestao_crise" ON public.gestao_crise
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND status = 'aprovado'
+    )
+  )
+  WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.profiles
       WHERE id = auth.uid() AND status = 'aprovado'
     )
   );
-
-CREATE POLICY "Escrita de gestao_crise" ON public.gestao_crise
-  FOR ALL USING (auth.uid() = user_id OR public.is_admin())
-  WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 -- ── Clientes Perdidos ────────────────────────────────────────
 DROP POLICY IF EXISTS "Acesso a clientes_perdidos" ON public.clientes_perdidos;
+DROP POLICY IF EXISTS "Leitura de clientes_perdidos" ON public.clientes_perdidos;
+DROP POLICY IF EXISTS "Escrita de clientes_perdidos" ON public.clientes_perdidos;
 
-CREATE POLICY "Leitura de clientes_perdidos" ON public.clientes_perdidos
-  FOR SELECT USING (
+CREATE POLICY "Acesso a clientes_perdidos" ON public.clientes_perdidos
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND status = 'aprovado'
+    )
+  )
+  WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.profiles
       WHERE id = auth.uid() AND status = 'aprovado'
     )
   );
-
-CREATE POLICY "Escrita de clientes_perdidos" ON public.clientes_perdidos
-  FOR ALL USING (auth.uid() = user_id OR public.is_admin())
-  WITH CHECK (auth.uid() = user_id OR public.is_admin());
