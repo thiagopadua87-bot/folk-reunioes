@@ -17,6 +17,7 @@ import {
 import { formatarCNPJ } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import { supabase } from "@/lib/supabase";
 
 // ── Badge da carta ───────────────────────────────────────────
 
@@ -167,10 +168,21 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
   const [excluindoAcao, setExcluindoAcao]             = useState<string | null>(null);
   const [confirmacaoExcluirAcaoId, setConfirmacaoExcluirAcaoId] = useState<string | null>(null);
 
+  const [isAdmin, setIsAdmin]           = useState(false);
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [cnpjAviso, setCnpjAviso]       = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      setIsAdmin(profile?.role === "admin");
+    }
+    checkAdmin();
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -759,32 +771,34 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                                 >
                                   Editar
                                 </button>
-                                {confirmacaoExcluirAcaoId === a.id ? (
-                                  <span className="flex items-center gap-1.5">
+                                {isAdmin && (
+                                  confirmacaoExcluirAcaoId === a.id ? (
+                                    <span className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleExcluirAcao(a.id)}
+                                        disabled={excluindoAcao === a.id}
+                                        className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-50"
+                                      >
+                                        {excluindoAcao === a.id ? "..." : "Confirmar"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmacaoExcluirAcaoId(null)}
+                                        className="text-xs text-gray-400 hover:text-gray-600"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </span>
+                                  ) : (
                                     <button
                                       type="button"
-                                      onClick={() => handleExcluirAcao(a.id)}
-                                      disabled={excluindoAcao === a.id}
-                                      className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-50"
+                                      onClick={() => setConfirmacaoExcluirAcaoId(a.id)}
+                                      className="text-xs font-semibold text-red-400 hover:text-red-600"
                                     >
-                                      {excluindoAcao === a.id ? "..." : "Confirmar"}
+                                      Excluir
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setConfirmacaoExcluirAcaoId(null)}
-                                      className="text-xs text-gray-400 hover:text-gray-600"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmacaoExcluirAcaoId(a.id)}
-                                    className="text-xs font-semibold text-red-400 hover:text-red-600"
-                                  >
-                                    Excluir
-                                  </button>
+                                  )
                                 )}
                               </div>
                             </td>
@@ -1096,14 +1110,16 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                     >
                       Contrato Perdido
                     </button>
-                    <button
-                      onClick={() => handleExcluir(c.id)}
-                      disabled={excluindo === c.id || estaPromovido}
-                      title={estaPromovido ? "Não é possível excluir um registro promovido a contrato perdido" : ""}
-                      className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {excluindo === c.id ? "..." : "Excluir"}
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleExcluir(c.id)}
+                        disabled={excluindo === c.id || estaPromovido}
+                        title={estaPromovido ? "Não é possível excluir um registro promovido a contrato perdido" : ""}
+                        className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {excluindo === c.id ? "..." : "Excluir"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
