@@ -85,7 +85,154 @@ export interface ObraLog {
   campo: string;
   valor_anterior: string;
   valor_novo: string;
+  autor_nome?: string | null;
   created_at: string;
+}
+
+// ── Obra Ações ────────────────────────────────────────────────
+
+export const OBRA_ACAO_STATUSES = [
+  { value: "pendente",            label: "Pendente" },
+  { value: "em_andamento",        label: "Em andamento" },
+  { value: "concluido",           label: "Concluído" },
+  { value: "aguardando_terceiro", label: "Aguardando terceiro" },
+  { value: "bloqueado",           label: "Bloqueado" },
+] as const;
+
+export const OBRA_ACAO_PRIORIDADES = [
+  { value: "baixa",   label: "Baixa" },
+  { value: "media",   label: "Média" },
+  { value: "alta",    label: "Alta" },
+  { value: "critica", label: "Crítica" },
+] as const;
+
+export type ObraAcaoStatus    = (typeof OBRA_ACAO_STATUSES)[number]["value"];
+export type ObraAcaoPrioridade = (typeof OBRA_ACAO_PRIORIDADES)[number]["value"];
+
+export interface ObraAcao {
+  id: string;
+  obra_id: string;
+  titulo: string;
+  descricao: string;
+  responsavel: string;
+  prazo: string | null;
+  status: ObraAcaoStatus;
+  prioridade: ObraAcaoPrioridade;
+  observacao: string;
+  data_conclusao: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ObraAcaoPayload = Omit<ObraAcao, "id" | "created_at" | "updated_at">;
+
+// ── Obra Pendências ───────────────────────────────────────────
+
+export const OBRA_PENDENCIA_NIVEIS = [
+  { value: "critico",     label: "Crítico" },
+  { value: "atencao",     label: "Atenção" },
+  { value: "informativo", label: "Informativo" },
+] as const;
+
+export const OBRA_PENDENCIA_STATUSES = [
+  { value: "aberta",     label: "Aberta" },
+  { value: "em_analise", label: "Em análise" },
+  { value: "resolvida",  label: "Resolvida" },
+] as const;
+
+export type ObraPendenciaNivel  = (typeof OBRA_PENDENCIA_NIVEIS)[number]["value"];
+export type ObraPendenciaStatus = (typeof OBRA_PENDENCIA_STATUSES)[number]["value"];
+
+export interface ObraPendencia {
+  id: string;
+  obra_id: string;
+  titulo: string;
+  descricao: string;
+  nivel: ObraPendenciaNivel;
+  responsavel: string;
+  status: ObraPendenciaStatus;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export type ObraPendenciaPayload = Omit<ObraPendencia, "id" | "created_at">;
+
+// ── Evento do histórico ───────────────────────────────────────
+
+export interface EventoObra {
+  id: string;
+  icone: string;
+  titulo: string;
+  descricao: string;
+  autor_nome?: string | null;
+  created_at: string;
+}
+
+// ── Label helpers ─────────────────────────────────────────────
+
+export const labelObraAcaoStatus     = (v: ObraAcaoStatus)     => OBRA_ACAO_STATUSES.find((s) => s.value === v)?.label ?? v;
+export const labelObraAcaoPrioridade = (v: ObraAcaoPrioridade) => OBRA_ACAO_PRIORIDADES.find((p) => p.value === v)?.label ?? v;
+export const labelObraPendenciaNivel  = (v: ObraPendenciaNivel)  => OBRA_PENDENCIA_NIVEIS.find((n) => n.value === v)?.label ?? v;
+export const labelObraPendenciaStatus = (v: ObraPendenciaStatus) => OBRA_PENDENCIA_STATUSES.find((s) => s.value === v)?.label ?? v;
+
+// ── formatarEventoObra ────────────────────────────────────────
+
+const EVENTO_ICONE: Record<string, string> = {
+  situacao:            "📋",
+  andamento:           "📊",
+  data_prazo:          "📅",
+  data_inicio:         "📅",
+  data_inicio_previsto:"📅",
+  equipe:              "👥",
+  tecnico:             "👤",
+  terceirizado:        "🏢",
+  valor_execucao:      "💰",
+  observacoes:         "📝",
+  acao_criada:         "✅",
+  acao_concluida:      "🎯",
+  acao_reaberta:       "🔄",
+  acao_editada:        "✏️",
+  acao_excluida:       "🗑️",
+  pendencia_criada:    "⚠️",
+  pendencia_resolvida: "✅",
+  pendencia_reaberta:  "🔄",
+  pendencia_excluida:  "🗑️",
+};
+
+const EVENTO_TITULO: Record<string, string> = {
+  situacao:            "Situação alterada",
+  andamento:           "Andamento atualizado",
+  data_prazo:          "Prazo alterado",
+  data_inicio:         "Data de registro alterada",
+  data_inicio_previsto:"Início previsto alterado",
+  equipe:              "Equipe alterada",
+  tecnico:             "Técnico alterado",
+  terceirizado:        "Terceirizado alterado",
+  valor_execucao:      "Valor de execução alterado",
+  observacoes:         "Comentários atualizados",
+  acao_criada:         "Ação registrada",
+  acao_concluida:      "Ação concluída",
+  acao_reaberta:       "Ação reaberta",
+  acao_editada:        "Ação editada",
+  acao_excluida:       "Ação removida",
+  pendencia_criada:    "Pendência registrada",
+  pendencia_resolvida: "Pendência resolvida",
+  pendencia_reaberta:  "Pendência reaberta",
+  pendencia_excluida:  "Pendência removida",
+};
+
+const EVENTOS_SIMPLES = new Set([
+  "acao_criada","acao_concluida","acao_reaberta","acao_editada","acao_excluida",
+  "pendencia_criada","pendencia_resolvida","pendencia_reaberta","pendencia_excluida",
+]);
+
+export function formatarEventoObra(log: ObraLog): EventoObra {
+  const icone = EVENTO_ICONE[log.campo] ?? "📌";
+  const titulo = EVENTO_TITULO[log.campo] ?? log.campo;
+  const descricao = EVENTOS_SIMPLES.has(log.campo)
+    ? (log.valor_novo || log.valor_anterior)
+    : [log.valor_anterior, log.valor_novo].filter(Boolean).join(" → ");
+  return { id: log.id, icone, titulo, descricao, autor_nome: log.autor_nome ?? null, created_at: log.created_at };
 }
 
 // ── Helpers de exibição ──────────────────────────────────────
@@ -289,4 +436,97 @@ async function registrarAlteracoesObra(
 
   if (logs.length === 0) return;
   await supabase.from("obra_logs").insert(logs);
+}
+
+// ── Helper interno ────────────────────────────────────────────
+
+async function registrarEventoObra(obraId: string, campo: string, valorAnterior: string, valorNovo: string): Promise<void> {
+  await supabase.from("obra_logs").insert({ obra_id: obraId, campo, valor_anterior: valorAnterior, valor_novo: valorNovo });
+}
+
+// ── CRUD Obra Ações ───────────────────────────────────────────
+
+export async function listarObraAcoes(obraId: string): Promise<ObraAcao[]> {
+  const { data, error } = await supabase
+    .from("obra_acoes").select("*").eq("obra_id", obraId).order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ObraAcao[];
+}
+
+export async function criarObraAcao(obraId: string, payload: Omit<ObraAcaoPayload, "obra_id">): Promise<void> {
+  const { error } = await supabase.from("obra_acoes").insert({ ...payload, obra_id: obraId });
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "acao_criada", "", payload.titulo).catch(() => {});
+}
+
+export async function editarObraAcao(id: string, obraId: string, payload: Omit<ObraAcaoPayload, "obra_id">): Promise<void> {
+  const { error } = await supabase.from("obra_acoes")
+    .update({ ...payload, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "acao_editada", payload.titulo, payload.titulo).catch(() => {});
+}
+
+export async function excluirObraAcao(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_acoes").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "acao_excluida", titulo, "").catch(() => {});
+}
+
+export async function concluirObraAcao(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_acoes")
+    .update({ status: "concluido", data_conclusao: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "acao_concluida", titulo, "").catch(() => {});
+}
+
+export async function reabrirObraAcao(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_acoes")
+    .update({ status: "pendente", data_conclusao: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "acao_reaberta", titulo, "").catch(() => {});
+}
+
+// ── CRUD Obra Pendências ──────────────────────────────────────
+
+export async function listarObraPendencias(obraId: string): Promise<ObraPendencia[]> {
+  const { data, error } = await supabase
+    .from("obra_pendencias").select("*").eq("obra_id", obraId).order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ObraPendencia[];
+}
+
+export async function criarObraPendencia(obraId: string, payload: Omit<ObraPendenciaPayload, "obra_id" | "resolved_at">): Promise<void> {
+  const { error } = await supabase.from("obra_pendencias").insert({ ...payload, obra_id: obraId, resolved_at: null });
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "pendencia_criada", "", payload.titulo).catch(() => {});
+}
+
+export async function editarObraPendencia(
+  id: string,
+  payload: Partial<Omit<ObraPendenciaPayload, "obra_id" | "resolved_at">>,
+): Promise<void> {
+  const { error } = await supabase.from("obra_pendencias").update(payload).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function excluirObraPendencia(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_pendencias").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "pendencia_excluida", titulo, "").catch(() => {});
+}
+
+export async function resolverObraPendencia(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_pendencias")
+    .update({ status: "resolvida", resolved_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "pendencia_resolvida", titulo, "").catch(() => {});
+}
+
+export async function reabrirObraPendencia(id: string, obraId: string, titulo: string): Promise<void> {
+  const { error } = await supabase.from("obra_pendencias")
+    .update({ status: "aberta", resolved_at: null }).eq("id", id);
+  if (error) throw new Error(error.message);
+  registrarEventoObra(obraId, "pendencia_reaberta", titulo, "").catch(() => {});
 }

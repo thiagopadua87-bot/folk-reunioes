@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   listarObras, criarObra, editarObra, excluirObra,
-  listarLogsObra,
   SITUACOES_OBRA, EQUIPES, ANDAMENTOS,
   labelSituacaoObra, labelEquipe, formatData, formatMoeda,
   calcularDiasExecucao, calcularDiasRestantes,
-  type Obra, type ObraLog, type ObraPayload, type SituacaoObra, type Equipe, type Andamento, type FiltrosObras,
+  type Obra, type ObraPayload, type SituacaoObra, type Equipe, type Andamento, type FiltrosObras,
 } from "@/lib/projetos";
 import { listarTecnicos, listarTerceirizados, type Tecnico, type Terceirizado } from "@/lib/cadastros";
 import { SERVICOS_COMERCIAL } from "@/lib/comercial";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import ObraAcoesSection from "./ObraAcoesSection";
+import ObraHistorico from "./ObraHistorico";
 
 // ── Estilos ──────────────────────────────────────────────────
 
@@ -29,25 +30,6 @@ const SITUACAO_BORDA: Record<SituacaoObra, string> = {
   paralizada:  "border-l-red-400",
   finalizada:  "border-l-green-400",
 };
-
-const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  data_inicio:          { label: "Data de registro",       dot: "bg-blue-400" },
-  data_inicio_previsto: { label: "Início previsto",        dot: "bg-indigo-400" },
-  data_prazo:     { label: "Prazo estimado",         dot: "bg-amber-400" },
-  situacao:       { label: "Situação",               dot: "bg-folk" },
-  equipe:         { label: "Equipe",                 dot: "bg-purple-400" },
-  tecnico:        { label: "Técnico",                dot: "bg-gray-400" },
-  terceirizado:   { label: "Terceirizado",           dot: "bg-orange-400" },
-  valor_execucao: { label: "Valor de execução",      dot: "bg-green-400" },
-  andamento:      { label: "Andamento",              dot: "bg-green-500" },
-  observacoes:    { label: "Observações",            dot: "bg-amber-400" },
-};
-
-function formatLogTs(s: string): string {
-  const d = new Date(s);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " +
-         d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-}
 
 // ── Sub-componentes ──────────────────────────────────────────
 
@@ -122,8 +104,7 @@ export default function ObrasTab() {
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
   const [filtros, setFiltros]       = useState<FiltrosObras>({ situacao: "", equipe: "" });
-  const [logs, setLogs]             = useState<ObraLog[]>([]);
-  const [carregandoLogs, setCarregandoLogs] = useState(false);
+  const [historicoKey, setHistoricoKey] = useState(0);
   const [tecnicos, setTecnicos]         = useState<Tecnico[]>([]);
   const [terceirizados, setTerceirizados] = useState<Terceirizado[]>([]);
 
@@ -140,16 +121,35 @@ export default function ObrasTab() {
     listarTerceirizados({ ativo: true }).then(setTerceirizados).catch(() => {});
   }, []);
 
-  async function carregarLogs(id: string) {
-    setCarregandoLogs(true);
-    try { setLogs(await listarLogsObra(id)); }
-    catch { setLogs([]); }
-    finally { setCarregandoLogs(false); }
-  }
+  const refreshHistorico = useCallback(() => setHistoricoKey((k) => k + 1), []);
 
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
-  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]); markClean(); setView("form"); }
+  // ── Derived lists (memoized — survive excluindo/salvando re-renders) ──
+  const mostrarDivisao = !filtros.situacao;
+
+  const obrasAtivas = useMemo(
+    () => mostrarDivisao
+      ? obras.filter((o) => o.situacao !== "finalizada")
+      : filtros.situacao !== "finalizada" ? obras : [],
+    [obras, mostrarDivisao, filtros.situacao],
+  );
+
+  const obrasFinalizadas = useMemo(
+    () => mostrarDivisao
+      ? obras.filter((o) => o.situacao === "finalizada")
+      : filtros.situacao === "finalizada" ? obras : [],
+    [obras, mostrarDivisao, filtros.situacao],
+  );
+
+  const contadorTexto = useMemo(
+    () => filtros.situacao
+      ? `${obras.length} obra${obras.length !== 1 ? "s" : ""}`
+      : `${obrasAtivas.length} obra${obrasAtivas.length !== 1 ? "s" : ""}`,
+    [filtros.situacao, obras.length, obrasAtivas.length],
+  );
+
+  function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form"); }
   function abrirEditar(o: Obra) {
     setEditando(o);
     setForm({
@@ -166,9 +166,9 @@ export default function ObrasTab() {
       andamento:       String(o.andamento),
       observacoes:     o.observacoes ?? "",
     });
-    setErroForm(null); markClean(); setView("form"); carregarLogs(o.id);
+    setErroForm(null); markClean(); setView("form");
   }
-  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); }); }
+  function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -201,9 +201,9 @@ export default function ObrasTab() {
       await carregar();
       if (idEditado) {
         setEditando((prev) => prev ? { ...prev, ...payload } : null);
-        setTimeout(() => carregarLogs(idEditado), 400);
+        refreshHistorico();
       } else {
-        setView("list"); setLogs([]);
+        setView("list");
       }
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -302,13 +302,13 @@ export default function ObrasTab() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className={LABEL}>Observações</label>
+              <label className={LABEL}>Comentários rápidos</label>
               <textarea
                 value={form.observacoes}
                 onChange={(e) => set("observacoes", e.target.value)}
-                placeholder="Informações adicionais sobre a obra..."
-                rows={3}
-                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full resize-none"
+                placeholder="Anotações rápidas sobre a obra..."
+                rows={2}
+                className="max-h-24 resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full overflow-y-auto"
               />
             </div>
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
@@ -322,37 +322,75 @@ export default function ObrasTab() {
         </Card>
 
         {editando && (
-          <Card className="p-6">
-            <h3 className="mb-4 text-sm font-semibold text-gray-800">Histórico de alterações</h3>
-            {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
-            {!carregandoLogs && logs.length === 0 && <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>}
-            {!carregandoLogs && logs.length > 0 && (
-              <div>
-                {logs.map((log, i) => {
-                  const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
-                  return (
-                    <div key={log.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                        {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
-                      </div>
-                      <div className={`${i < logs.length - 1 ? "pb-4" : ""} min-w-0`}>
-                        <p className="text-[11px] text-gray-400 mb-0.5">{formatLogTs(log.created_at)}</p>
-                        <p className="text-xs font-semibold text-gray-500">{cfg.label}</p>
-                        <p className="text-sm text-gray-700">{log.valor_anterior} → {log.valor_novo}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+          <>
+            <ObraAcoesSection obraId={editando.id} onAcaoChange={refreshHistorico} />
+            <ObraHistorico obraId={editando.id} refreshKey={historicoKey} />
+          </>
         )}
       </div>
     );
   }
 
   // ── Listagem ───────────────────────────────────────────────
+
+  function renderCard(o: Obra, idx: number) {
+    return (
+      <div key={o.id} className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${SITUACAO_BORDA[o.situacao]}`}>
+        <div className="flex items-start justify-between gap-4 px-6 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-gray-400">#{idx + 1}</span>
+              <p className="truncate text-sm font-bold text-gray-900">{o.cliente}</p>
+              <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${SITUACAO_BADGE[o.situacao]}`}>
+                {labelSituacaoObra(o.situacao)}
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+              <span>{labelEquipe(o.equipe)}{o.equipe === "equipe_propria" && o.tecnico_nome ? ` — ${o.tecnico_nome}` : o.equipe === "terceiro" && o.terceirizado_nome ? ` — ${o.terceirizado_nome}` : ""}</span>
+              {o.equipe === "terceiro" && o.valor_execucao > 0 && <><span>·</span><span>{formatMoeda(o.valor_execucao)}</span></>}
+              <span>·</span>
+              <span>Registro: {formatData(o.data_inicio)}</span>
+              {o.data_inicio_previsto && <><span>·</span><span>Início previsto: {formatData(o.data_inicio_previsto)}</span></>}
+              {o.data_prazo && <><span>·</span><span>Prazo: {formatData(o.data_prazo)}</span></>}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <BarraAndamento valor={o.andamento} />
+              {(() => {
+                const dias = calcularDiasExecucao(o);
+                const restantes = calcularDiasRestantes(o);
+                return (
+                  <>
+                    <span className="text-xs text-gray-400">
+                      {o.situacao === "finalizada" ? `Concluída em ${dias} dia${dias !== 1 ? "s" : ""}` : `${dias} dia${dias !== 1 ? "s" : ""} em execução`}
+                    </span>
+                    {restantes !== null && (
+                      <span className={`text-xs font-semibold ${restantes < 0 ? "text-red-500" : restantes <= 7 ? "text-amber-500" : "text-gray-400"}`}>
+                        {restantes < 0 ? `${Math.abs(restantes)}d em atraso` : restantes === 0 ? "Prazo: hoje" : `${restantes}d restantes`}
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+            {o.servicos?.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {o.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}
+              </div>
+            )}
+            {o.observacoes && (
+              <p className="mt-2 text-xs italic text-gray-400">{o.observacoes}</p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button onClick={() => abrirEditar(o)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
+            <button onClick={() => handleExcluir(o.id)} disabled={excluindo === o.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
+              {excluindo === o.id ? "..." : "Excluir"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -376,7 +414,7 @@ export default function ObrasTab() {
       </Card>
 
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${obras.length} obra${obras.length !== 1 ? "s" : ""}`}</p>
+        <p className="text-sm text-gray-500">{carregando ? "Carregando..." : contadorTexto}</p>
         <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">+ Nova obra</button>
       </div>
 
@@ -388,62 +426,20 @@ export default function ObrasTab() {
 
       {obras.length > 0 && (
         <div className="flex flex-col gap-3">
-          {obras.map((o, idx) => (
-            <div key={o.id} className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${SITUACAO_BORDA[o.situacao]}`}>
-              <div className="flex items-start justify-between gap-4 px-6 py-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-gray-400">#{idx + 1}</span>
-                    <p className="text-sm font-bold text-gray-900">{o.cliente}</p>
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${SITUACAO_BADGE[o.situacao]}`}>
-                      {labelSituacaoObra(o.situacao)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                    <span>{labelEquipe(o.equipe)}{o.equipe === "equipe_propria" && o.tecnico_nome ? ` — ${o.tecnico_nome}` : o.equipe === "terceiro" && o.terceirizado_nome ? ` — ${o.terceirizado_nome}` : ""}</span>
-                    {o.equipe === "terceiro" && o.valor_execucao > 0 && <><span>·</span><span>{formatMoeda(o.valor_execucao)}</span></>}
-                    <span>·</span>
-                    <span>Registro: {formatData(o.data_inicio)}</span>
-                    {o.data_inicio_previsto && <><span>·</span><span>Início previsto: {formatData(o.data_inicio_previsto)}</span></>}
-                    {o.data_prazo && <><span>·</span><span>Prazo: {formatData(o.data_prazo)}</span></>}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-4">
-                    <BarraAndamento valor={o.andamento} />
-                    {(() => {
-                      const dias = calcularDiasExecucao(o);
-                      const restantes = calcularDiasRestantes(o);
-                      return (
-                        <>
-                          <span className="text-xs text-gray-400">
-                            {o.situacao === "finalizada" ? `Concluída em ${dias} dia${dias !== 1 ? "s" : ""}` : `${dias} dia${dias !== 1 ? "s" : ""} em execução`}
-                          </span>
-                          {restantes !== null && (
-                            <span className={`text-xs font-semibold ${restantes < 0 ? "text-red-500" : restantes <= 7 ? "text-amber-500" : "text-gray-400"}`}>
-                              {restantes < 0 ? `${Math.abs(restantes)}d em atraso` : restantes === 0 ? "Prazo: hoje" : `${restantes}d restantes`}
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {o.servicos?.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {o.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}
-                    </div>
-                  )}
-                  {o.observacoes && (
-                    <p className="mt-2 text-xs text-gray-400 italic">{o.observacoes}</p>
-                  )}
+          {obrasAtivas.map((o, idx) => renderCard(o, idx))}
+
+          {obrasFinalizadas.length > 0 && (
+            <>
+              {mostrarDivisao && obrasAtivas.length > 0 && (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex-1 border-t border-dashed border-gray-200" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Obras Finalizadas</p>
+                  <div className="flex-1 border-t border-dashed border-gray-200" />
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => abrirEditar(o)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-                  <button onClick={() => handleExcluir(o.id)} disabled={excluindo === o.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-                    {excluindo === o.id ? "..." : "Excluir"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              )}
+              {obrasFinalizadas.map((o, idx) => renderCard(o, idx))}
+            </>
+          )}
         </div>
       )}
     </div>
