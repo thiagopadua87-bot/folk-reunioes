@@ -26,7 +26,7 @@ export const NIVEIS_RISCO = [
 ] as const;
 
 export type TipoServico = (typeof TIPOS_SERVICO)[number]["value"];
-export type MotivoPerda = (typeof MOTIVOS_PERDA)[number]["value"];
+export type MotivoPerda = string;
 export type NivelRisco  = (typeof NIVEIS_RISCO)[number]["value"];
 
 export interface ClientePerdido {
@@ -248,7 +248,11 @@ async function getAutorNome(): Promise<string | null> {
 export function labelTipoServico(v: TipoServico) {
   return TIPOS_SERVICO.find((t) => t.value === v)?.label ?? v;
 }
-export function labelMotivoPerda(v: MotivoPerda) {
+export function labelMotivoPerda(v: string, list?: Array<{ id: string; nome: string }>): string {
+  if (list) {
+    const found = list.find((m) => m.id === v);
+    if (found) return found.nome;
+  }
   return MOTIVOS_PERDA.find((m) => m.value === v)?.label ?? v;
 }
 export function labelNivelRisco(v: NivelRisco) {
@@ -267,7 +271,7 @@ export function formatData(s: string) {
 export interface FiltrosClientesPerdidos {
   dataInicio?: string;
   dataFim?: string;
-  motivo?: MotivoPerda | "";
+  motivo?: string;
   winnerCompetitorId?: string;
 }
 

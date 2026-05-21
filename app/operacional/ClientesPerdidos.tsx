@@ -5,12 +5,12 @@ import {
   listarClientesPerdidos, criarClientePerdido, editarClientePerdido, excluirClientePerdido,
   listarLogsClientePerdido, listarHistoricoUnificado,
   formatarEventoClientePerdido,
-  TIPOS_SERVICO, MOTIVOS_PERDA,
+  TIPOS_SERVICO,
   labelTipoServico, labelMotivoPerda, formatMoeda, formatData,
-  type ClientePerdido, type EventoHistorico, type TipoServico, type MotivoPerda,
+  type ClientePerdido, type EventoHistorico, type TipoServico,
   type FiltrosClientesPerdidos,
 } from "@/lib/operacional";
-import { listarCompetitors, formatarCNPJ, type Competitor } from "@/lib/cadastros";
+import { listarCompetitors, listarMotivosPerda, formatarCNPJ, type Competitor, type MotivoPerda as MotivoPerdaItem } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { supabase } from "@/lib/supabase";
@@ -24,7 +24,7 @@ interface FormState {
   cliente: string;
   tipo_servico: TipoServico;
   valor_contrato: string;
-  motivo_perda: MotivoPerda;
+  motivo_perda: string;
   winner_competitor_id: string;
   observacoes: string;
 }
@@ -36,7 +36,7 @@ const FORM_VAZIO: FormState = {
   cliente: "",
   tipo_servico: "portaria_remota",
   valor_contrato: "",
-  motivo_perda: "qualidade_servico",
+  motivo_perda: "",
   winner_competitor_id: "",
   observacoes: "",
 };
@@ -105,6 +105,7 @@ export default function ClientesPerdidos({
 }: ClientesPerdidosProps = {}) {
   const [registros, setRegistros]           = useState<ClientePerdido[]>([]);
   const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
+  const [allMotivos, setAllMotivos]         = useState<MotivoPerdaItem[]>([]);
   const [buscandoCNPJ, setBuscandoCNPJ]     = useState(false);
   const [cnpjAviso, setCnpjAviso]           = useState<string | null>(null);
   const [carregando, setCarregando]       = useState(true);
@@ -174,7 +175,7 @@ export default function ClientesPerdidos({
     setCarregando(true);
     setErro(null);
     try {
-      const [data, comps] = await Promise.all([
+      const [data, comps, motivos] = await Promise.all([
         listarClientesPerdidos({
           dataInicio:         filtros.dataInicio         || undefined,
           dataFim:            filtros.dataFim            || undefined,
@@ -182,9 +183,11 @@ export default function ClientesPerdidos({
           winnerCompetitorId: filtros.winnerCompetitorId || undefined,
         }),
         listarCompetitors({ status: "ativo" }),
+        listarMotivosPerda({ status: "ativo" }),
       ]);
       setRegistros(data);
       setAllCompetitors(comps);
+      setAllMotivos(motivos);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar registros.");
     } finally {
@@ -376,8 +379,9 @@ export default function ClientesPerdidos({
 
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Motivo da perda</label>
-              <select value={form.motivo_perda} onChange={(e) => set("motivo_perda", e.target.value as MotivoPerda)} className={INPUT}>
-                {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              <select value={form.motivo_perda} onChange={(e) => set("motivo_perda", e.target.value)} className={INPUT}>
+                <option value="">— Selecione um motivo —</option>
+                {allMotivos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
               </select>
             </div>
 
@@ -468,9 +472,9 @@ export default function ClientesPerdidos({
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Motivo da perda</label>
-            <select value={filtros.motivo} onChange={(e) => setFiltros((f) => ({ ...f, motivo: e.target.value as MotivoPerda | "" }))} className={INPUT}>
+            <select value={filtros.motivo ?? ""} onChange={(e) => setFiltros((f) => ({ ...f, motivo: e.target.value }))} className={INPUT}>
               <option value="">Todos</option>
-              {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              {allMotivos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -606,7 +610,7 @@ export default function ClientesPerdidos({
                   </td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{labelTipoServico(r.tipo_servico)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-700">{formatMoeda(r.valor_contrato)}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{labelMotivoPerda(r.motivo_perda)}</td>
+                  <td className="py-3.5 pr-4 text-sm text-gray-500">{labelMotivoPerda(r.motivo_perda, allMotivos)}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">
                     {r.winner_competitor_id
                       ? (() => {

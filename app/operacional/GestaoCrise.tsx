@@ -7,14 +7,14 @@ import {
   listarCrisisActions, criarCrisisAction, editarCrisisAction, excluirCrisisAction,
   calcularEncerramentoBR, calcularEncerramentoISO, diasParaEncerramento,
   formatarEventoCrise, formatMoeda,
-  TIPOS_SERVICO, NIVEIS_RISCO, MOTIVOS_PERDA,
+  TIPOS_SERVICO, NIVEIS_RISCO,
   labelTipoServico, labelNivelRisco, formatData,
   type CriseItem, type EventoHistorico,
-  type TipoServico, type NivelRisco, type MotivoPerda,
+  type TipoServico, type NivelRisco,
   type CriseEditPayload,
   type CrisisAction, type CrisisActionStatus, type CrisisActionPayload,
 } from "@/lib/operacional";
-import { formatarCNPJ } from "@/lib/cadastros";
+import { formatarCNPJ, listarMotivosPerda, type MotivoPerda } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { supabase } from "@/lib/supabase";
@@ -112,7 +112,7 @@ interface FormPromoverState {
   data_aviso: string;
   data_encerramento: string;
   valor_contrato: string;
-  motivo_perda: MotivoPerda;
+  motivo_perda: string;
   observacoes: string;
 }
 
@@ -144,11 +144,17 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
   const [arquivoNovo, setArquivoNovo]     = useState<File | null>(null);
   const [removendoArq, setRemovendoArq]   = useState(false);
 
+  // Motivos de perda (carregados do banco)
+  const [allMotivos, setAllMotivos] = useState<MotivoPerda[]>([]);
+  useEffect(() => {
+    listarMotivosPerda({ status: "ativo" }).then(setAllMotivos).catch(() => {});
+  }, []);
+
   // Modal: Promover a Cliente Perdido
   const [modalPromover, setModalPromover]         = useState<CriseItem | null>(null);
   const [formPromover, setFormPromover]           = useState<FormPromoverState>({
     data_aviso: "", data_encerramento: "", valor_contrato: "",
-    motivo_perda: "qualidade_servico", observacoes: "",
+    motivo_perda: "", observacoes: "",
   });
   const [salvandoPromover, setSalvandoPromover]   = useState(false);
   const [erroPromover, setErroPromover]           = useState<string | null>(null);
@@ -408,7 +414,7 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
           ? calcularEncerramentoISO(c.data_aviso, c.prazo_aviso_dias)
           : "",
       valor_contrato: c.valor_contrato > 0 ? String(c.valor_contrato) : "",
-      motivo_perda: "qualidade_servico",
+      motivo_perda: "",
       observacoes: c.acoes.trim(),
     });
     setErroPromover(null);
@@ -1178,10 +1184,11 @@ export default function GestaoCrise({ onNavigarParaClientePerdido }: GestaoCrise
                 <label className={LABEL}>Motivo da perda</label>
                 <select
                   value={formPromover.motivo_perda}
-                  onChange={(e) => setFormPromover((p) => ({ ...p, motivo_perda: e.target.value as MotivoPerda }))}
+                  onChange={(e) => setFormPromover((p) => ({ ...p, motivo_perda: e.target.value }))}
                   className={INPUT}
                 >
-                  {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  <option value="">— Selecione um motivo —</option>
+                  {allMotivos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5 sm:col-span-2">

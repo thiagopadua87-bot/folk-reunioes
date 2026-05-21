@@ -192,3 +192,44 @@ export async function editarCompetitor(id: string, payload: CompetitorPayload): 
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// ── Motivos de Perda ─────────────────────────────────────────
+
+export interface MotivoPerda {
+  id: string;
+  nome: string;
+  status: "ativo" | "inativo";
+  created_at: string;
+  updated_at: string;
+}
+
+export type MotivoPerdaPayload = { nome: string; status: "ativo" | "inativo" };
+
+export interface FiltrosMotivosPerda { busca?: string; status?: "ativo" | "inativo" | "" }
+
+export async function listarMotivosPerda(filtros?: FiltrosMotivosPerda): Promise<MotivoPerda[]> {
+  let q = supabase.from("motivos_perda").select("*").order("nome");
+  if (filtros?.status) q = q.eq("status", filtros.status);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const lista = (data ?? []) as MotivoPerda[];
+  if (filtros?.busca) {
+    const b = filtros.busca.toLowerCase();
+    return lista.filter((m) => m.nome.toLowerCase().includes(b));
+  }
+  return lista;
+}
+
+export async function criarMotivoPerda(payload: MotivoPerdaPayload): Promise<MotivoPerda> {
+  const { data, error } = await supabase.from("motivos_perda").insert(payload).select().single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar motivo de perda.");
+  return data as MotivoPerda;
+}
+
+export async function editarMotivoPerda(id: string, payload: MotivoPerdaPayload): Promise<void> {
+  const { error } = await supabase
+    .from("motivos_perda")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}

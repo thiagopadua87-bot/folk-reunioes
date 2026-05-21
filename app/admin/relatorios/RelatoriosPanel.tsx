@@ -15,11 +15,11 @@ import {
 } from "@/lib/projetos";
 import {
   listarClientesPerdidos,
-  MOTIVOS_PERDA, TIPOS_SERVICO,
+  TIPOS_SERVICO,
   labelMotivoPerda, labelTipoServico,
   type ClientePerdido,
 } from "@/lib/operacional";
-import { listarVendedores, listarCompetitors, formatarCNPJ } from "@/lib/cadastros";
+import { listarVendedores, listarCompetitors, listarMotivosPerda, formatarCNPJ, type MotivoPerda as MotivoPerdaItem } from "@/lib/cadastros";
 
 // ── Tipos ────────────────────────────────────────────────────
 
@@ -62,15 +62,18 @@ export default function RelatoriosPanel() {
   const [vendedores, setVendedores]       = useState<{ id: string; nome: string }[]>([]);
   const [concorrentes, setConcorrentes]   = useState<{ id: string; trade_name: string; legal_name: string }[]>([]);
   const [concorrentesMap, setConcorrentesMap] = useState<Map<string, string>>(new Map());
+  const [motivosList, setMotivosList]     = useState<MotivoPerdaItem[]>([]);
 
   async function carregarFiltros() {
-    const [vends, comps] = await Promise.all([
+    const [vends, comps, motivos] = await Promise.all([
       listarVendedores({ ativo: true }).catch(() => []),
       listarCompetitors({ status: "ativo" }).catch(() => []),
+      listarMotivosPerda({ status: "ativo" }).catch(() => []),
     ]);
     setVendedores(vends);
     setConcorrentes(comps);
     setConcorrentesMap(new Map(comps.map((c) => [c.id, c.trade_name || c.legal_name])));
+    setMotivosList(motivos);
   }
 
   async function gerarRelatorio() {
@@ -182,7 +185,7 @@ export default function RelatoriosPanel() {
         "CNPJ":              r.cnpj ? formatarCNPJ(r.cnpj) : "",
         "Tipo de Serviço":   labelTipoServico(r.tipo_servico),
         "Valor (R$)":        r.valor_contrato,
-        "Motivo da Perda":   labelMotivoPerda(r.motivo_perda),
+        "Motivo da Perda":   labelMotivoPerda(r.motivo_perda, motivosList),
         "Concorrente Vencedor": r.winner_competitor_id ? (concorrentesMap.get(r.winner_competitor_id) ?? "") : "",
         "Observações":       r.observacoes,
       }));
@@ -305,7 +308,7 @@ export default function RelatoriosPanel() {
               <label className={LABEL}>Motivo da perda</label>
               <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={INPUT}>
                 <option value="">Todos</option>
-                {MOTIVOS_PERDA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {motivosList.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
               </select>
             </div>
           )}
@@ -384,7 +387,7 @@ export default function RelatoriosPanel() {
               {dados.tipo === "pipeline" && <TabelaPipeline rows={dados.rows} />}
               {dados.tipo === "obras" && <TabelaObras rows={dados.rows} />}
               {dados.tipo === "clientes_perdidos" && (
-                <TabelaClientesPerdidos rows={dados.rows} concorrentesMap={concorrentesMap} />
+                <TabelaClientesPerdidos rows={dados.rows} concorrentesMap={concorrentesMap} motivosList={motivosList} />
               )}
             </div>
           )}
@@ -508,8 +511,8 @@ function TabelaObras({ rows }: { rows: Obra[] }) {
 }
 
 function TabelaClientesPerdidos({
-  rows, concorrentesMap,
-}: { rows: ClientePerdido[]; concorrentesMap: Map<string, string> }) {
+  rows, concorrentesMap, motivosList,
+}: { rows: ClientePerdido[]; concorrentesMap: Map<string, string>; motivosList: MotivoPerdaItem[] }) {
   return (
     <table className="w-full">
       <thead>
@@ -533,7 +536,7 @@ function TabelaClientesPerdidos({
             <td className={`${TD} text-gray-400`}>{r.cnpj ? formatarCNPJ(r.cnpj) : "—"}</td>
             <td className={TD}>{labelTipoServico(r.tipo_servico)}</td>
             <td className={TD}>{MOEDA_CELL(r.valor_contrato)}</td>
-            <td className={TD}>{labelMotivoPerda(r.motivo_perda)}</td>
+            <td className={TD}>{labelMotivoPerda(r.motivo_perda, motivosList)}</td>
             <td className={TD}>
               {r.winner_competitor_id ? (concorrentesMap.get(r.winner_competitor_id) ?? "—") : "—"}
             </td>

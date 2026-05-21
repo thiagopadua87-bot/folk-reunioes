@@ -5,15 +5,17 @@ import VendedoresTab from "./VendedoresTab";
 import TecnicosTab from "./TecnicosTab";
 import TerceirizadosTab from "./TerceirizadosTab";
 import CompetitoresTab from "./CompetitoresTab";
+import MotivosDePerda from "./MotivosDePerda";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
-type Aba = "vendedores" | "tecnicos" | "terceirizados" | "concorrentes";
+type Aba = "vendedores" | "tecnicos" | "terceirizados" | "concorrentes" | "motivos_perda";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "vendedores",    label: "Vendedores",    descricao: "Equipe comercial responsável pelas vendas" },
-  { value: "tecnicos",      label: "Técnicos",      descricao: "Técnicos internos para execução de obras e serviços" },
-  { value: "terceirizados", label: "Terceirizados", descricao: "Empresas e parceiros terceirizados" },
-  { value: "concorrentes",  label: "Concorrentes",  descricao: "Empresas concorrentes presentes nas oportunidades" },
+  { value: "vendedores",    label: "Vendedores",      descricao: "Equipe comercial responsável pelas vendas" },
+  { value: "tecnicos",      label: "Técnicos",        descricao: "Técnicos internos para execução de obras e serviços" },
+  { value: "terceirizados", label: "Terceirizados",   descricao: "Empresas e parceiros terceirizados" },
+  { value: "concorrentes",  label: "Concorrentes",    descricao: "Empresas concorrentes presentes nas oportunidades" },
+  { value: "motivos_perda", label: "Motivos de Perda", descricao: "Cadastro dos motivos utilizados na gestão de clientes perdidos" },
 ];
 
 export default function CadastrosPage() {
@@ -29,7 +31,7 @@ export default function CadastrosPage() {
         <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
       </div>
 
-      <div className="mb-8 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
+      <div className="mb-8 flex flex-wrap gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
@@ -47,6 +49,7 @@ export default function CadastrosPage() {
       {aba === "tecnicos"      && <TecnicosTab />}
       {aba === "terceirizados" && <TerceirizadosTab />}
       {aba === "concorrentes"  && <CompetitoresTab />}
+      {aba === "motivos_perda" && <MotivosDePerda />}
     </main>
   );
 }
