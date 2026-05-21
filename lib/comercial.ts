@@ -134,6 +134,7 @@ export interface FiltrosVendas {
   dataFim?: string;
   tipoVenda?: TipoVenda | "";
   cliente?: string;
+  vendedorId?: string;
   pagina?: number;
   porPagina?: number;
 }
@@ -169,10 +170,11 @@ export async function listarVendas(filtros?: FiltrosVendas): Promise<PaginaVenda
     .select("*, venda_servicos(servico), vendedores!vendedor_id(nome)", { count: "exact" })
     .order("data_fechamento", { ascending: false })
     .range(offset, offset + porPagina - 1);
-  if (filtros?.dataInicio) q = q.gte("data_fechamento", filtros.dataInicio);
-  if (filtros?.dataFim)    q = q.lte("data_fechamento", filtros.dataFim);
-  if (filtros?.tipoVenda)  q = q.eq("tipo_venda", filtros.tipoVenda);
-  if (filtros?.cliente)    q = q.ilike("cliente", `%${filtros.cliente}%`);
+  if (filtros?.dataInicio)  q = q.gte("data_fechamento", filtros.dataInicio);
+  if (filtros?.dataFim)     q = q.lte("data_fechamento", filtros.dataFim);
+  if (filtros?.tipoVenda)   q = q.eq("tipo_venda", filtros.tipoVenda);
+  if (filtros?.cliente)     q = q.ilike("cliente", `%${filtros.cliente}%`);
+  if (filtros?.vendedorId)  q = q.eq("vendedor_id", filtros.vendedorId);
   const { data, error, count } = await q;
   if (error) throw new Error(error.message);
   return {
@@ -331,6 +333,7 @@ export type PipelinePayload = Omit<PipelineItem, "id" | "user_id" | "created_at"
 export interface FiltrosPipeline {
   temperatura?: Temperatura | "";
   status?: StatusPipeline | "";
+  vendedorId?: string;
 }
 
 type RawPipelineItem = Omit<PipelineItem, "vendedor_nome"> & {

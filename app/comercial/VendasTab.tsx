@@ -136,7 +136,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
   const [excluindo, setExcluindo]     = useState<string | null>(null);
   const [enviando, setEnviando]       = useState<string | null>(null);
   const [visualizando, setVisualizando] = useState<Venda | null>(null);
-  const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "", cliente: "" });
+  const [filtros, setFiltros] = useState<FiltrosVendas>({ dataInicio: "", dataFim: "", tipoVenda: "", cliente: "", vendedorId: "" });
   const [pagina, setPagina]       = useState(1);
   const [porPagina, setPorPagina] = useState(10);
   const [total, setTotal]         = useState(0);
@@ -153,7 +153,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
     setCarregando(true); setErro(null);
     try {
       const [pagina_dados, vends] = await Promise.all([
-        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, pagina, porPagina }),
+        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, vendedorId: filtros.vendedorId || undefined, pagina, porPagina }),
         listarVendedores({ ativo: true }),
       ]);
       if (reqId !== reqIdRef.current) return;
@@ -453,7 +453,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
       )}
 
       <Card className="mb-5 p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
             <label className={LABEL}>Buscar cliente</label>
             <input
@@ -477,6 +477,13 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
             <select value={filtros.tipoVenda} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, tipoVenda: e.target.value as TipoVenda | "" }))} className={INPUT}>
               <option value="">Todos</option>
               {TIPOS_VENDA.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className={LABEL}>Vendedor</label>
+            <select value={filtros.vendedorId ?? ""} onChange={(e) => setFiltrosEResetar((f) => ({ ...f, vendedorId: e.target.value }))} className={INPUT}>
+              <option value="">Todos</option>
+              {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
             </select>
           </div>
         </div>

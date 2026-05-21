@@ -254,7 +254,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
   const [convertendo, setConvertendo] = useState<string | null>(null);
-  const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "" });
+  const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "", vendedorId: "" });
   const [buscaCliente, setBuscaCliente] = useState("");
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
@@ -398,6 +398,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const registrosExibidos = registros.filter((r) => {
     if (filtros.temperatura && r.temperatura !== filtros.temperatura) return false;
     if (filtros.status && r.status !== filtros.status) return false;
+    if (filtros.vendedorId && r.vendedor_id !== filtros.vendedorId) return false;
     if (busca && !r.cliente.toLowerCase().includes(busca)) return false;
     return true;
   });
@@ -705,8 +706,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       )}
 
       <Card className="mb-5 p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-1.5 sm:col-span-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
             <label className={LABEL}>Buscar cliente</label>
             <input
               type="text"
@@ -728,6 +729,13 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             <select value={filtros.status} onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value as StatusPipeline | "" }))} className={INPUT}>
               <option value="">Todos</option>
               {STATUS_PIPELINE.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className={LABEL}>Vendedor</label>
+            <select value={filtros.vendedorId ?? ""} onChange={(e) => setFiltros((f) => ({ ...f, vendedorId: e.target.value }))} className={INPUT}>
+              <option value="">Todos</option>
+              {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
             </select>
           </div>
         </div>
