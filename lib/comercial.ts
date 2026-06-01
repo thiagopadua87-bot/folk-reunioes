@@ -73,6 +73,8 @@ export interface PipelineItem {
   servicos: string[];
   convertido_em_venda: boolean;
   venda_id: string | null;
+  cnpj: string;
+  sindico_gestor_id: string | null;
   winner_competitor_id: string | null;
   loss_reason: string;
   created_at: string;
@@ -519,6 +521,12 @@ async function registrarAlteracoes(
   const autorNome = await getAutorNome();
   const logs: LogInput[] = [];
 
+  const cnpjFmt = (v: string) => {
+    const d = v.replace(/\D/g, "");
+    if (d.length !== 14) return v || "—";
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  };
+
   if (antigo.status !== novo.status) {
     logs.push({ proposta_id: propostaId, campo: "status", valor_anterior: labelStatusPipeline(antigo.status), valor_novo: labelStatusPipeline(novo.status), autor_nome: autorNome });
   }
@@ -554,6 +562,23 @@ async function registrarAlteracoes(
 
   if (antigo.cliente !== novo.cliente)
     logs.push({ proposta_id: propostaId, campo: "cliente", valor_anterior: antigo.cliente, valor_novo: novo.cliente, autor_nome: autorNome });
+
+  if ((antigo.cnpj ?? "") !== (novo.cnpj ?? ""))
+    logs.push({ proposta_id: propostaId, campo: "cnpj", valor_anterior: cnpjFmt(antigo.cnpj ?? ""), valor_novo: cnpjFmt(novo.cnpj ?? ""), autor_nome: autorNome });
+
+  if ((antigo.sindico_gestor_id ?? null) !== (novo.sindico_gestor_id ?? null)) {
+    const [resAnt, resNov] = await Promise.all([
+      antigo.sindico_gestor_id
+        ? supabase.from("sindicos_gestores").select("nome").eq("id", antigo.sindico_gestor_id).single()
+        : Promise.resolve({ data: null }),
+      novo.sindico_gestor_id
+        ? supabase.from("sindicos_gestores").select("nome").eq("id", novo.sindico_gestor_id).single()
+        : Promise.resolve({ data: null }),
+    ]);
+    const nomeAnt = (resAnt.data as { nome: string } | null)?.nome ?? "—";
+    const nomeNov = (resNov.data as { nome: string } | null)?.nome ?? "—";
+    logs.push({ proposta_id: propostaId, campo: "sindico_gestor", valor_anterior: nomeAnt, valor_novo: nomeNov, autor_nome: autorNome });
+  }
 
   if ((antigo.indicado_por ?? "") !== (novo.indicado_por ?? ""))
     logs.push({ proposta_id: propostaId, campo: "indicado_por", valor_anterior: antigo.indicado_por || "—", valor_novo: novo.indicado_por || "—", autor_nome: autorNome });

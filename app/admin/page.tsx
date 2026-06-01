@@ -44,17 +44,15 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-start justify-between gap-4">
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Usuários</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Olá, {profile?.nome}. Gerencie os pedidos de acesso ao sistema.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
+          <p className="mt-1 text-sm text-gray-500">Gerencie usuários e relatórios do sistema</p>
         </div>
         <Link
           href="/admin/relatorios"
-          className="rounded-2xl bg-folk-gradient px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 whitespace-nowrap"
+          className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 whitespace-nowrap"
         >
           Relatórios
         </Link>

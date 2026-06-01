@@ -6,16 +6,18 @@ import TecnicosTab from "./TecnicosTab";
 import TerceirizadosTab from "./TerceirizadosTab";
 import CompetitoresTab from "./CompetitoresTab";
 import MotivosDePerda from "./MotivosDePerda";
+import SindicosGestoresTab from "./SindicosGestoresTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
-type Aba = "vendedores" | "tecnicos" | "terceirizados" | "concorrentes" | "motivos_perda";
+type Aba = "vendedores" | "tecnicos" | "terceirizados" | "concorrentes" | "motivos_perda" | "sindicos_gestores";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "vendedores",    label: "Vendedores",      descricao: "Equipe comercial responsável pelas vendas" },
-  { value: "tecnicos",      label: "Técnicos",        descricao: "Técnicos internos para execução de obras e serviços" },
-  { value: "terceirizados", label: "Terceirizados",   descricao: "Empresas e parceiros terceirizados" },
-  { value: "concorrentes",  label: "Concorrentes",    descricao: "Empresas concorrentes presentes nas oportunidades" },
-  { value: "motivos_perda", label: "Motivos de Perda", descricao: "Cadastro dos motivos utilizados na gestão de clientes perdidos" },
+  { value: "vendedores",       label: "Vendedores",        descricao: "Equipe comercial responsável pelas vendas" },
+  { value: "tecnicos",         label: "Técnicos",          descricao: "Técnicos internos para execução de obras e serviços" },
+  { value: "terceirizados",    label: "Terceirizados",     descricao: "Empresas e parceiros terceirizados" },
+  { value: "concorrentes",     label: "Concorrentes",      descricao: "Empresas concorrentes presentes nas oportunidades" },
+  { value: "motivos_perda",    label: "Motivos de Perda",  descricao: "Cadastro dos motivos utilizados na gestão de clientes perdidos" },
+  { value: "sindicos_gestores", label: "Síndicos/Gestores", descricao: "Síndicos e gestores vinculados aos leads do pipeline" },
 ];
 
 export default function CadastrosPage() {
@@ -49,7 +51,8 @@ export default function CadastrosPage() {
       {aba === "tecnicos"      && <TecnicosTab />}
       {aba === "terceirizados" && <TerceirizadosTab />}
       {aba === "concorrentes"  && <CompetitoresTab />}
-      {aba === "motivos_perda" && <MotivosDePerda />}
+      {aba === "motivos_perda"    && <MotivosDePerda />}
+      {aba === "sindicos_gestores" && <SindicosGestoresTab />}
     </main>
   );
 }

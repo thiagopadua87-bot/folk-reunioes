@@ -193,6 +193,59 @@ export async function editarCompetitor(id: string, payload: CompetitorPayload): 
   if (error) throw new Error(error.message);
 }
 
+// ── Síndicos / Gestores ───────────────────────────────────────
+
+export const TIPOS_SINDICO_GESTOR = [
+  "Síndico Morador",
+  "Síndico Profissional",
+  "Gestor de Contrato",
+] as const;
+
+export type TipoSindicoGestor = (typeof TIPOS_SINDICO_GESTOR)[number];
+
+export interface SindicoGestor {
+  id: string;
+  user_id: string;
+  nome: string;
+  telefone: string;
+  email: string;
+  tipo: TipoSindicoGestor;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SindicoGestorPayload = Omit<SindicoGestor, "id" | "user_id" | "created_at" | "updated_at">;
+
+export interface FiltrosSindicosGestores { busca?: string; ativo?: boolean | null }
+
+export async function listarSindicosGestores(filtros?: FiltrosSindicosGestores): Promise<SindicoGestor[]> {
+  let q = supabase.from("sindicos_gestores").select("*").order("nome");
+  if (filtros?.ativo != null) q = q.eq("ativo", filtros.ativo);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const lista = (data ?? []) as SindicoGestor[];
+  if (filtros?.busca) {
+    const b = filtros.busca.toLowerCase();
+    return lista.filter((s) => s.nome.toLowerCase().includes(b) || s.tipo.toLowerCase().includes(b));
+  }
+  return lista;
+}
+
+export async function criarSindicoGestor(payload: SindicoGestorPayload): Promise<SindicoGestor> {
+  const { data, error } = await supabase.from("sindicos_gestores").insert(payload).select().single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar síndico/gestor.");
+  return data as SindicoGestor;
+}
+
+export async function editarSindicoGestor(id: string, payload: SindicoGestorPayload): Promise<void> {
+  const { error } = await supabase
+    .from("sindicos_gestores")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // ── Motivos de Perda ─────────────────────────────────────────
 
 export interface MotivoPerda {

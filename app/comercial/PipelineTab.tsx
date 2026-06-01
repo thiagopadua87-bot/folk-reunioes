@@ -9,7 +9,11 @@ import {
   type PipelineItem, type PipelinePayload, type PipelineLog,
   type Temperatura, type StatusPipeline, type FiltrosPipeline,
 } from "@/lib/comercial";
-import { listarVendedores, listarCompetitors, type Vendedor, type Competitor } from "@/lib/cadastros";
+import {
+  listarVendedores, listarCompetitors, listarSindicosGestores, criarSindicoGestor,
+  TIPOS_SINDICO_GESTOR,
+  type Vendedor, type Competitor, type SindicoGestor, type TipoSindicoGestor,
+} from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
@@ -45,6 +49,8 @@ const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
   valor_mensal:         { label: "Valor mensal",               dot: "bg-emerald-400" },
   data_lead:            { label: "Data do lead",              dot: "bg-blue-300" },
   cliente:              { label: "Cliente",                   dot: "bg-gray-500" },
+  cnpj:                 { label: "CNPJ",                      dot: "bg-gray-400" },
+  sindico_gestor:       { label: "Síndico/Gestor",             dot: "bg-folk" },
   indicado_por:         { label: "Indicado por",              dot: "bg-amber-400" },
   observacoes:          { label: "Observações",               dot: "bg-amber-300" },
   servico_adicionado:   { label: "Serviço adicionado",        dot: "bg-folk" },
@@ -75,6 +81,15 @@ function formatLogTs(s: string): string {
 }
 
 // ── Formulário ───────────────────────────────────────────────
+
+function formatarCNPJ(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2)  return d;
+  if (d.length <= 5)  return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8)  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
 
 function CheckboxServicos({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
   function toggle(s: string) {
@@ -210,13 +225,113 @@ function SelectCompetitors({
   );
 }
 
+function SelectSindicoGestor({
+  all, selectedId, onChange, onCadastrarNovo,
+}: {
+  all: SindicoGestor[];
+  selectedId: string;
+  onChange: (id: string) => void;
+  onCadastrarNovo: (buscaAtual: string) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = all.find((s) => s.id === selectedId) ?? null;
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtrados = useMemo(() => {
+    const ativos = all.filter((s) => s.ativo);
+    if (!busca) return ativos;
+    const b = busca.toLowerCase();
+    return ativos.filter((s) => s.nome.toLowerCase().includes(b) || s.tipo.toLowerCase().includes(b));
+  }, [all, busca]);
+
+  if (selected) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between rounded-xl border border-folk/20 bg-folk/5 px-3 py-2.5">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{selected.nome}</p>
+            <p className="text-xs text-gray-500">{selected.tipo}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="ml-2 shrink-0 text-xs text-gray-400 hover:text-red-500"
+          >
+            ✕
+          </button>
+        </div>
+        {(selected.telefone || selected.email) && (
+          <div className="flex flex-col gap-0.5 pl-1 text-xs text-gray-500">
+            {selected.telefone && <span>Tel: {selected.telefone}</span>}
+            {selected.email    && <span>E-mail: {selected.email}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        type="text"
+        value={busca}
+        onChange={(e) => { setBusca(e.target.value); setAberto(true); }}
+        onFocus={() => setAberto(true)}
+        placeholder="Pesquisar síndico ou gestor..."
+        className={INPUT}
+      />
+      {aberto && (
+        <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
+          <ul className="max-h-52 overflow-y-auto py-1">
+            {filtrados.length === 0 && (
+              <li className="px-4 py-2.5 text-xs text-gray-400">Nenhum cadastro encontrado.</li>
+            )}
+            {filtrados.map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(s.id); setBusca(""); setAberto(false); }}
+                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-gray-50"
+                >
+                  <span className="text-sm font-medium text-gray-900">{s.nome}</span>
+                  <span className="text-xs text-gray-400">{s.tipo}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="border-t border-gray-100 px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => { setAberto(false); onCadastrarNovo(busca); }}
+              className="text-xs font-semibold text-folk hover:underline"
+            >
+              + Cadastrar novo síndico/gestor
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface FormState {
   data_inicio_lead: string;
   vendedor_id: string;
+  cnpj: string;
   cliente: string;
   temperatura: Temperatura;
   valor_implantacao: string;
   valor_mensal: string;
+  sindico_gestor_id: string;
   status: StatusPipeline;
   servicos: string[];
   indicado_por: string;
@@ -226,7 +341,8 @@ interface FormState {
 }
 
 const FORM_VAZIO: FormState = {
-  data_inicio_lead: "", vendedor_id: "", cliente: "",
+  data_inicio_lead: "", vendedor_id: "", cnpj: "", cliente: "",
+  sindico_gestor_id: "",
   temperatura: "morna", valor_implantacao: "", valor_mensal: "", status: "apresentacao",
   servicos: [], indicado_por: "", observacoes: "",
   winner_competitor_id: "", loss_reason: "",
@@ -258,8 +374,16 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [buscaCliente, setBuscaCliente] = useState("");
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
+  const [buscandoCNPJ, setBuscandoCNPJ]     = useState(false);
+  const [erroCNPJ, setErroCNPJ]             = useState<string | null>(null);
+  const [nomeFantasiaCNPJ, setNomeFantasiaCNPJ] = useState<string | null>(null);
   const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
   const [competitorIds, setCompetitorIds]   = useState<string[]>([]);
+  const [allSindicosGestores, setAllSindicosGestores] = useState<SindicoGestor[]>([]);
+  const [modalSindico, setModalSindico] = useState<{
+    aberto: boolean; nome: string; telefone: string; email: string;
+    tipo: TipoSindicoGestor; salvando: boolean; erro: string | null;
+  }>({ aberto: false, nome: "", telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null });
   const [modalDeclinado, setModalDeclinado] = useState<{
     aberto: boolean; winner_competitor_id: string; loss_reason: string; erro: string | null;
   }>({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null });
@@ -280,15 +404,17 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
-      const [lista, vends, comps] = await Promise.all([
+      const [lista, vends, comps, sindicos] = await Promise.all([
         listarPipeline(),
         listarVendedores({ ativo: true }),
         listarCompetitors({ status: "ativo" }),
+        listarSindicosGestores(),
       ]);
       if (reqId !== reqIdRef.current) return;
       setRegistros(lista);
       setVendedores(vends);
       setAllCompetitors(comps);
+      setAllSindicosGestores(sindicos);
     } catch (e) {
       if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
@@ -310,13 +436,17 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
   function abrirNovo() {
     setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]);
-    setCompetitorIds([]); markClean(); setView("form");
+    setCompetitorIds([]); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
+    setModalSindico((p) => ({ ...p, aberto: false }));
+    markClean(); setView("form");
   }
   function abrirEditar(r: PipelineItem) {
     setEditando(r);
     setForm({
       data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "",
+      cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "",
       cliente: r.cliente, temperatura: r.temperatura,
+      sindico_gestor_id: r.sindico_gestor_id ?? "",
       valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal),
       status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por,
       observacoes: r.observacoes,
@@ -324,14 +454,56 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       loss_reason: r.loss_reason ?? "",
     });
     setCompetitorIds([]);
-    setErroForm(null); markClean(); setView("form");
+    setErroForm(null); setErroCNPJ(null); setNomeFantasiaCNPJ(null); markClean(); setView("form");
     carregarLogs(r.id);
     listarOpportunityCompetitors(r.id).then(setCompetitorIds).catch(() => {});
   }
   function cancelar() {
-    guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setLogs([]); setCompetitorIds([]); });
+    guardCancel(() => {
+      setView("list"); setEditando(null); setErroForm(null); setLogs([]);
+      setCompetitorIds([]); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
+      setModalSindico((p) => ({ ...p, aberto: false }));
+    });
   }
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
+
+  async function buscarRazaoSocial(cnpjMascarado: string) {
+    const digits = cnpjMascarado.replace(/\D/g, "");
+    if (digits.length !== 14) return;
+    setBuscandoCNPJ(true); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+      if (!res.ok) throw new Error("CNPJ não encontrado. Preencha os dados manualmente.");
+      const data = await res.json();
+      const razao = (data.razao_social as string) ?? "";
+      const fantasia = (data.nome_fantasia as string) ?? "";
+      if (razao) setForm((p) => ({ ...p, cliente: razao }));
+      if (fantasia) setNomeFantasiaCNPJ(fantasia);
+    } catch (e) {
+      setErroCNPJ(e instanceof Error ? e.message : "CNPJ não encontrado. Preencha os dados manualmente.");
+    } finally {
+      setBuscandoCNPJ(false);
+    }
+  }
+
+  async function criarSindicoRapido() {
+    if (!modalSindico.nome.trim()) {
+      setModalSindico((p) => ({ ...p, erro: "Nome é obrigatório." })); return;
+    }
+    setModalSindico((p) => ({ ...p, salvando: true, erro: null }));
+    try {
+      const novo = await criarSindicoGestor({
+        nome: modalSindico.nome.trim(), telefone: modalSindico.telefone.trim(),
+        email: modalSindico.email.trim(), tipo: modalSindico.tipo, ativo: true,
+      });
+      setAllSindicosGestores((prev) => [...prev, novo]);
+      setForm((p) => ({ ...p, sindico_gestor_id: novo.id }));
+      markDirty();
+      setModalSindico({ aberto: false, nome: "", telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null });
+    } catch (e) {
+      setModalSindico((p) => ({ ...p, salvando: false, erro: e instanceof Error ? e.message : "Erro ao salvar." }));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -341,7 +513,9 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       const payload: PipelinePayload = {
         data_inicio_lead:  form.data_inicio_lead,
         vendedor_id:       form.vendedor_id || null,
+        cnpj:              form.cnpj.replace(/\D/g, ""),
         cliente:           form.cliente.trim(),
+        sindico_gestor_id: form.sindico_gestor_id || null,
         temperatura:       form.temperatura,
         valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
         valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
@@ -395,11 +569,16 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   };
 
   const busca = buscaCliente.toLowerCase().trim();
+  const buscaDigits = busca.replace(/\D/g, "");
   const registrosExibidos = registros.filter((r) => {
     if (filtros.temperatura && r.temperatura !== filtros.temperatura) return false;
     if (filtros.status && r.status !== filtros.status) return false;
     if (filtros.vendedorId && r.vendedor_id !== filtros.vendedorId) return false;
-    if (busca && !r.cliente.toLowerCase().includes(busca)) return false;
+    if (busca) {
+      const matchCliente = r.cliente.toLowerCase().includes(busca);
+      const matchCNPJ = buscaDigits.length >= 3 && (r.cnpj ?? "").includes(buscaDigits);
+      if (!matchCliente && !matchCNPJ) return false;
+    }
     return true;
   });
 
@@ -455,6 +634,27 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               </select>
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className={LABEL}>CNPJ</label>
+              <input
+                type="text"
+                value={form.cnpj}
+                onChange={(e) => {
+                  const formatted = formatarCNPJ(e.target.value);
+                  set("cnpj", formatted);
+                  setErroCNPJ(null);
+                  if (formatted.replace(/\D/g, "").length === 14) buscarRazaoSocial(formatted);
+                }}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                className={INPUT}
+              />
+              {buscandoCNPJ && <p className="text-[11px] text-gray-400">Buscando razão social...</p>}
+              {erroCNPJ && <p className="text-[11px] text-amber-600">{erroCNPJ}</p>}
+              {nomeFantasiaCNPJ && !erroCNPJ && (
+                <p className="text-[11px] text-gray-500">Nome Fantasia: <span className="font-medium">{nomeFantasiaCNPJ}</span></p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Cliente *</label>
               <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente"
                 disabled={!!editando?.convertido_em_venda}
@@ -491,6 +691,17 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 disabled={!!editando?.convertido_em_venda}
                 className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Síndico / Gestor</label>
+              <SelectSindicoGestor
+                all={allSindicosGestores}
+                selectedId={form.sindico_gestor_id}
+                onChange={(id) => { set("sindico_gestor_id", id); }}
+                onCadastrarNovo={(busca) =>
+                  setModalSindico({ aberto: true, nome: busca, telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })
+                }
+              />
             </div>
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Serviços</label>
@@ -629,6 +840,83 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           </div>
         )}
 
+        {/* ── Modal: Cadastro rápido de síndico/gestor ── */}
+        {modalSindico.aberto && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h3 className="text-base font-bold text-gray-900">Cadastrar síndico/gestor</h3>
+                <p className="mt-0.5 text-sm text-gray-500">O registro será vinculado automaticamente a este lead.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className={LABEL}>Nome *</label>
+                  <input
+                    type="text"
+                    value={modalSindico.nome}
+                    onChange={(e) => setModalSindico((p) => ({ ...p, nome: e.target.value, erro: null }))}
+                    placeholder="Nome completo"
+                    autoFocus
+                    className={INPUT}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className={LABEL}>Tipo *</label>
+                  <select
+                    value={modalSindico.tipo}
+                    onChange={(e) => setModalSindico((p) => ({ ...p, tipo: e.target.value as TipoSindicoGestor }))}
+                    className={INPUT}
+                  >
+                    {TIPOS_SINDICO_GESTOR.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>Telefone</label>
+                  <input
+                    type="tel"
+                    value={modalSindico.telefone}
+                    onChange={(e) => setModalSindico((p) => ({ ...p, telefone: e.target.value }))}
+                    placeholder="(00) 00000-0000"
+                    className={INPUT}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={LABEL}>E-mail</label>
+                  <input
+                    type="email"
+                    value={modalSindico.email}
+                    onChange={(e) => setModalSindico((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="email@exemplo.com"
+                    className={INPUT}
+                  />
+                </div>
+                {modalSindico.erro && (
+                  <div className="sm:col-span-2"><Alert status="error" message={modalSindico.erro} /></div>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setModalSindico({ aberto: false, nome: "", telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })}
+                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={criarSindicoRapido}
+                  disabled={modalSindico.salvando}
+                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                >
+                  {modalSindico.salvando ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Histórico — só aparece na edição */}
         {editando && (
           <Card className="p-6">
@@ -708,12 +996,12 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-            <label className={LABEL}>Buscar cliente</label>
+            <label className={LABEL}>Buscar</label>
             <input
               type="text"
               value={buscaCliente}
               onChange={(e) => setBuscaCliente(e.target.value)}
-              placeholder="Nome do cliente..."
+              placeholder="Nome do cliente ou CNPJ..."
               className={INPUT}
             />
           </div>
@@ -770,6 +1058,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               key={r.id}
               r={r}
               allCompetitors={allCompetitors}
+              allSindicosGestores={allSindicosGestores}
               excluindo={excluindo}
               convertendo={convertendo}
               onEditar={abrirEditar}
@@ -793,6 +1082,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                   key={r.id}
                   r={r}
                   allCompetitors={allCompetitors}
+                  allSindicosGestores={allSindicosGestores}
                   excluindo={excluindo}
                   convertendo={convertendo}
                   onEditar={abrirEditar}
@@ -810,11 +1100,12 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 }
 
 function PropostaCard({
-  r, allCompetitors, excluindo, convertendo,
+  r, allCompetitors, allSindicosGestores, excluindo, convertendo,
   onEditar, onExcluir, onConverter, onIrParaVendas,
 }: {
   r: PipelineItem;
   allCompetitors: Competitor[];
+  allSindicosGestores: SindicoGestor[];
   excluindo: string | null;
   convertendo: string | null;
   onEditar: (r: PipelineItem) => void;
@@ -827,6 +1118,10 @@ function PropostaCard({
         const c = allCompetitors.find((x) => x.id === r.winner_competitor_id);
         return c ? (c.trade_name || c.legal_name) : null;
       })()
+    : null;
+
+  const sindico = r.sindico_gestor_id
+    ? allSindicosGestores.find((s) => s.id === r.sindico_gestor_id) ?? null
     : null;
 
   return (
@@ -848,6 +1143,7 @@ function PropostaCard({
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+            {r.cnpj && <><span>{formatarCNPJ(r.cnpj)}</span><span>·</span></>}
             {r.vendedor_nome && <><span>{r.vendedor_nome}</span><span>·</span></>}
             {r.indicado_por  && <><span>Indicado por {r.indicado_por}</span><span>·</span></>}
             <span>Lead desde {formatData(r.data_inicio_lead)}</span>
@@ -869,6 +1165,13 @@ function PropostaCard({
             </div>
           )}
           {r.observacoes && <p className="mt-2 text-xs text-gray-400 italic">{r.observacoes}</p>}
+          {sindico && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
+              <span className="text-xs font-semibold text-gray-600">{sindico.nome}</span>
+              <span className="text-xs text-gray-400">{sindico.tipo}</span>
+              {sindico.telefone && <span className="text-xs text-gray-400">{sindico.telefone}</span>}
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="flex items-center gap-2">
