@@ -825,6 +825,10 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                           if (tipo === "Assembleia") {
                             next.status = "assembleia_marcada";
                             if (p.proxima_acao_datahora) next.data_assembleia = p.proxima_acao_datahora;
+                          } else if (p.proxima_acao_tipo === "Assembleia") {
+                            // Revert automático ao sair de Assembleia
+                            next.data_assembleia = "";
+                            if (p.status === "assembleia_marcada") next.status = "lead_cadastrado";
                           }
                           return next;
                         });
