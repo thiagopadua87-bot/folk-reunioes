@@ -371,15 +371,22 @@ function KanbanCard({
           </div>
         )}
 
-        {/* Última interação */}
-        {(() => {
-          const interacao = calcInteracaoStatus(item.ultima_interacao);
-          return (
-            <p className={`mt-1.5 text-[9px] font-medium ${interacao.cls}`}>
-              Último contato {interacao.texto}
-            </p>
-          );
-        })()}
+        {/* Última interação + status Google Calendar */}
+        <div className="mt-1.5 flex items-center justify-between gap-1">
+          {(() => {
+            const interacao = calcInteracaoStatus(item.ultima_interacao);
+            return (
+              <p className={`text-[9px] font-medium ${interacao.cls}`}>
+                Último contato {interacao.texto}
+              </p>
+            );
+          })()}
+          {item.google_sync_status === "sincronizado" && (
+            <span title="Sincronizado com Google Calendar" className="text-[9px] text-blue-500 font-semibold">
+              📅
+            </span>
+          )}
+        </div>
 
         {/* Ações do card */}
         <div className="mt-2 flex items-center justify-between gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

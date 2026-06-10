@@ -576,13 +576,25 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 
   async function handleRegistrarAgenda() {
     if (!editando) return;
+    if (!form.proxima_acao_datahora) {
+      setErroForm("Defina a data da próxima ação antes de sincronizar com o Google Calendar.");
+      return;
+    }
     setSalvandoAgenda(true);
+    setAgendaRegistrada(false);
     try {
-      await registrarIntencaoAgenda(editando.id, form.vendedor_id || null);
+      const res = await fetch("/api/agenda/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipeline_id: editando.id, action: "sync" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao sincronizar.");
       setAgendaRegistrada(true);
-      setTimeout(() => setAgendaRegistrada(false), 4000);
-    } catch {
-      // best-effort
+      setTimeout(() => setAgendaRegistrada(false), 5000);
+      await carregar();
+    } catch (e) {
+      setErroForm(e instanceof Error ? e.message : "Erro ao sincronizar com Google Calendar.");
     } finally {
       setSalvandoAgenda(false);
     }
@@ -852,16 +864,30 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                       placeholder="Detalhes sobre a próxima ação..." className={`${INPUT} resize-none`} />
                   </div>
 
-                  {/* Botão Adicionar à Agenda */}
+                  {/* Botão Sincronizar com Google Calendar */}
                   {editando && (
-                    <div className="sm:col-span-2 flex items-center gap-3">
-                      <button type="button" onClick={handleRegistrarAgenda} disabled={salvandoAgenda}
-                        className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                    <div className="sm:col-span-2 flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleRegistrarAgenda}
+                        disabled={salvandoAgenda || !form.proxima_acao_datahora}
+                        className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors"
+                      >
                         <span>📅</span>
-                        {salvandoAgenda ? "Registrando..." : "Adicionar à Agenda"}
+                        {salvandoAgenda
+                          ? "Sincronizando..."
+                          : editando.google_sync_status === "sincronizado"
+                          ? "Atualizar no Google Calendar"
+                          : "Adicionar ao Google Calendar"}
                       </button>
+                      {editando.google_sync_status === "sincronizado" && !agendaRegistrada && (
+                        <p className="text-xs text-emerald-600 font-medium">✓ Evento sincronizado</p>
+                      )}
                       {agendaRegistrada && (
-                        <p className="text-xs text-emerald-600 font-medium">✓ Intenção de sincronização registrada.</p>
+                        <p className="text-xs text-emerald-600 font-medium">✓ Google Calendar atualizado!</p>
+                      )}
+                      {!form.proxima_acao_datahora && (
+                        <p className="text-xs text-gray-400">Defina a data da próxima ação para sincronizar.</p>
                       )}
                     </div>
                   )}

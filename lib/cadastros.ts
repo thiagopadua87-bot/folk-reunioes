@@ -9,6 +9,7 @@ export interface Vendedor {
   telefone: string;
   email: string;
   ativo: boolean;
+  google_calendar_id: string | null;
   created_at: string;
 }
 
@@ -62,7 +63,7 @@ export function formatarCPF(v: string): string {
 
 // ── Vendedores ───────────────────────────────────────────────
 
-export type VendedorPayload = Omit<Vendedor, "id" | "user_id" | "created_at">;
+export type VendedorPayload = Omit<Vendedor, "id" | "user_id" | "created_at" | "google_calendar_id"> & { google_calendar_id?: string | null };
 
 export interface FiltrosVendedores { busca?: string; ativo?: boolean | null }
 
