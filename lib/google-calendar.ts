@@ -1,10 +1,20 @@
 import { google } from "googleapis";
 
+function normalizePrivateKey(raw: string): string {
+  // Remove aspas extras que o Vercel/shell pode adicionar
+  let k = raw.trim().replace(/^"+|"+$/g, "");
+  // Se ainda tiver \n literais (dois caracteres), converte para quebra real
+  if (!k.includes("\n")) k = k.replace(/\\n/g, "\n");
+  return k;
+}
+
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key   = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const raw   = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
-  if (!email || !key) throw new Error("Credenciais Google não configuradas.");
+  if (!email || !raw) throw new Error("Credenciais Google não configuradas.");
+
+  const key = normalizePrivateKey(raw);
 
   return new google.auth.JWT({
     email,
