@@ -482,16 +482,29 @@ export async function excluirPipelineItem(id: string): Promise<void> {
 export interface PipelineLixeiraItem {
   id: string;
   pipeline_id: string;
+  user_id: string;
   cliente: string;
   cnpj: string | null;
   status: string;
   temperatura: string;
+  vendedor_id: string | null;
   vendedor_nome: string | null;
   indicado_por: string;
+  observacoes: string | null;
   valor_implantacao: number;
   valor_mensal: number;
   data_inicio_lead: string | null;
   servicos: string[] | null;
+  sindico_gestor_id: string | null;
+  winner_competitor_id: string | null;
+  loss_reason: string | null;
+  proxima_acao_datahora: string | null;
+  proxima_acao_tipo: string | null;
+  proxima_acao_descricao: string | null;
+  data_assembleia: string | null;
+  ultima_interacao: string | null;
+  convertido_em_venda: boolean | null;
+  venda_id: string | null;
   excluido_em: string;
   excluido_por_nome: string | null;
   pipeline_created_at: string | null;
@@ -500,10 +513,65 @@ export interface PipelineLixeiraItem {
 export async function listarPipelineLixeira(): Promise<PipelineLixeiraItem[]> {
   const { data, error } = await supabase
     .from("pipeline_lixeira")
-    .select("id, pipeline_id, cliente, cnpj, status, temperatura, vendedor_nome, indicado_por, valor_implantacao, valor_mensal, data_inicio_lead, servicos, excluido_em, excluido_por_nome, pipeline_created_at")
+    .select("*")
     .order("excluido_em", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as PipelineLixeiraItem[];
+}
+
+export async function restaurarPipelineItem(lixeiraId: string): Promise<string> {
+  const { data: item, error: errFetch } = await supabase
+    .from("pipeline_lixeira")
+    .select("*")
+    .eq("id", lixeiraId)
+    .single();
+  if (errFetch || !item) throw new Error("Item não encontrado na lixeira.");
+
+  const autorNome = await getAutorNome();
+
+  const { data: restaurado, error: errInsert } = await supabase
+    .from("pipeline")
+    .insert({
+      id:                     item.pipeline_id,
+      user_id:                item.user_id,
+      cliente:                item.cliente,
+      cnpj:                   item.cnpj ?? "",
+      status:                 item.status,
+      temperatura:            item.temperatura,
+      vendedor_id:            item.vendedor_id,
+      indicado_por:           item.indicado_por ?? "",
+      observacoes:            item.observacoes ?? "",
+      servicos:               item.servicos ?? [],
+      valor_implantacao:      item.valor_implantacao ?? 0,
+      valor_mensal:           item.valor_mensal ?? 0,
+      data_inicio_lead:       item.data_inicio_lead,
+      sindico_gestor_id:      item.sindico_gestor_id,
+      winner_competitor_id:   item.winner_competitor_id,
+      loss_reason:            item.loss_reason ?? "",
+      proxima_acao_datahora:  item.proxima_acao_datahora,
+      proxima_acao_tipo:      item.proxima_acao_tipo,
+      proxima_acao_descricao: item.proxima_acao_descricao ?? "",
+      data_assembleia:        item.data_assembleia,
+      ultima_interacao:       new Date().toISOString(),
+      convertido_em_venda:    item.convertido_em_venda ?? false,
+      venda_id:               item.venda_id,
+    })
+    .select("id")
+    .single();
+
+  if (errInsert || !restaurado) throw new Error("Erro ao restaurar: " + (errInsert?.message ?? "sem retorno"));
+
+  await supabase.from("pipeline_logs").insert({
+    proposta_id:    restaurado.id,
+    campo:          "restauracao",
+    valor_anterior: "excluido",
+    valor_novo:     "restaurado",
+    autor_nome:     autorNome,
+  });
+
+  await supabase.from("pipeline_lixeira").delete().eq("id", lixeiraId);
+
+  return restaurado.id;
 }
 
 // ── Opportunity Competitors ───────────────────────────────────
