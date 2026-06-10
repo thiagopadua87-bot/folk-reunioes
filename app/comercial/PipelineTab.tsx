@@ -346,6 +346,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [allSindicosGestores, setAllSindicosGestores] = useState<SindicoGestor[]>([]);
   const [salvandoAgenda, setSalvandoAgenda] = useState(false);
   const [agendaRegistrada, setAgendaRegistrada] = useState(false);
+  const statusAntesAssembleia = useRef<StatusPipeline | null>(null);
   const [modalSindico, setModalSindico] = useState<{
     aberto: boolean; nome: string; telefone: string; email: string;
     tipo: TipoSindicoGestor; salvando: boolean; erro: string | null;
@@ -401,6 +402,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
   function abrirNovo() {
+    statusAntesAssembleia.current = null;
     setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]);
     setCompetitorIds([]); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
     setModalSindico((p) => ({ ...p, aberto: false }));
@@ -409,6 +411,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   }
 
   function abrirEditar(r: PipelineItem) {
+    statusAntesAssembleia.current = null;
     setEditando(r);
     setForm({
       data_inicio_lead: r.data_inicio_lead,
@@ -823,12 +826,13 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                         setForm((p) => {
                           const next = { ...p, proxima_acao_tipo: tipo };
                           if (tipo === "Assembleia") {
+                            statusAntesAssembleia.current = p.status;
                             next.status = "assembleia_marcada";
                             if (p.proxima_acao_datahora) next.data_assembleia = p.proxima_acao_datahora;
                           } else if (p.proxima_acao_tipo === "Assembleia") {
-                            // Revert automático ao sair de Assembleia
                             next.data_assembleia = "";
-                            if (p.status === "assembleia_marcada") next.status = "lead_cadastrado";
+                            next.status = statusAntesAssembleia.current ?? "lead_cadastrado";
+                            statusAntesAssembleia.current = null;
                           }
                           return next;
                         });
