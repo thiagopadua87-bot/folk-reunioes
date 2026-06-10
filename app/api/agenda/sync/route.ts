@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
       titulo,
       descricao,
       inicio:     item.proxima_acao_datahora,
-      convidados: item.vendedores?.email ? [item.vendedores.email] : [],
     });
 
     await supabase.from("pipeline").update({

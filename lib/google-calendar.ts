@@ -30,7 +30,6 @@ export interface EventoCalendario {
   descricao:   string;
   inicio:      string; // ISO datetime
   fim?:        string; // ISO datetime — se omitido usa inicio + 1h
-  convidados?: string[];
 }
 
 function fimPadrao(inicio: string): string {
@@ -48,7 +47,6 @@ export async function criarOuAtualizarEvento(ev: EventoCalendario): Promise<stri
     description: ev.descricao,
     start: { dateTime: ev.inicio, timeZone: "America/Sao_Paulo" },
     end:   { dateTime: ev.fim ?? fimPadrao(ev.inicio), timeZone: "America/Sao_Paulo" },
-    attendees: (ev.convidados ?? []).map((email) => ({ email })),
   };
 
   if (ev.eventId) {
