@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS public.pipeline_lixeira (
 
 ALTER TABLE public.pipeline_lixeira ENABLE ROW LEVEL SECURITY;
 
--- Somente admin lê; qualquer usuário aprovado pode inserir (via service role na função)
+DROP POLICY IF EXISTS "admin_le_lixeira"      ON public.pipeline_lixeira;
+DROP POLICY IF EXISTS "usuario_insere_lixeira" ON public.pipeline_lixeira;
+
 CREATE POLICY "admin_le_lixeira" ON public.pipeline_lixeira
   FOR SELECT USING (
     EXISTS (
