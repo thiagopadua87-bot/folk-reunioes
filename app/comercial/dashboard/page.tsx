@@ -52,11 +52,13 @@ const TEMP_COR: Record<Temperatura, string> = {
 };
 
 const STATUS_PIPE_COR: Record<StatusPipeline, string> = {
-  apresentacao:  "#94a3b8",
-  em_analise:    "#f59e0b",
-  assinatura:    "#F05A28",
-  declinado:     "#ef4444",
-  fechado_ganho: "#059669",
+  lead_cadastrado:      "#94a3b8",
+  apresentacao_empresa: "#60a5fa",
+  proposta_analise:     "#f59e0b",
+  assembleia_marcada:   "#a78bfa",
+  assinatura_contrato:  "#F05A28",
+  fechado:              "#059669",
+  declinado:            "#ef4444",
 };
 
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
@@ -212,7 +214,7 @@ export default function ComercialDashboardPage() {
   // ── Pipeline ─────────────────────────────────────────────────
 
   const hoje = hojeStr();
-  const pipelineAtivos         = pipeline.filter((p) => !["declinado", "fechado_ganho"].includes(p.status));
+  const pipelineAtivos         = pipeline.filter((p) => !["declinado", "fechado"].includes(p.status));
   const valorImplantacaoPotencial = pipelineAtivos.reduce((s, p) => s + p.valor_implantacao, 0);
   const valorMensalPotencial      = pipelineAtivos.reduce((s, p) => s + p.valor_mensal, 0);
   const convertidos       = pipeline.filter((p) => p.convertido_em_venda);

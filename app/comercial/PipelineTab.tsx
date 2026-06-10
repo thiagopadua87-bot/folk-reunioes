@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   listarPipeline, criarPipelineItem, editarPipelineItem, excluirPipelineItem,
+  atualizarStatusPipeline, registrarIntencaoAgenda,
   listarLogs, listarOpportunityCompetitors, sincronizarOpportunityCompetitors,
-  TEMPERATURAS, STATUS_PIPELINE, SERVICOS_COMERCIAL,
+  TEMPERATURAS, STATUS_PIPELINE, SERVICOS_COMERCIAL, PROXIMA_ACAO_TIPOS,
   labelTemperatura, labelStatusPipeline, formatMoeda, formatData,
   type PipelineItem, type PipelinePayload, type PipelineLog,
   type Temperatura, type StatusPipeline, type FiltrosPipeline,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import KanbanPipeline from "./KanbanPipeline";
 
 // ── Estilos visuais ──────────────────────────────────────────
 
@@ -32,40 +34,41 @@ const TEMP_BORDA: Record<Temperatura, string> = {
 };
 
 const STATUS_BADGE: Record<StatusPipeline, string> = {
-  apresentacao:  "bg-gray-100 text-gray-600 border-gray-200",
-  em_analise:    "bg-yellow-100 text-yellow-700 border-yellow-200",
-  assinatura:    "bg-folk/10 text-folk border-folk/20",
-  declinado:     "bg-red-100 text-red-500 border-red-200",
-  fechado_ganho: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  lead_cadastrado:      "bg-slate-100 text-slate-600 border-slate-200",
+  apresentacao_empresa: "bg-blue-100 text-blue-700 border-blue-200",
+  proposta_analise:     "bg-yellow-100 text-yellow-700 border-yellow-200",
+  assembleia_marcada:   "bg-purple-100 text-purple-700 border-purple-200",
+  assinatura_contrato:  "bg-folk/10 text-folk border-folk/20",
+  fechado:              "bg-emerald-100 text-emerald-700 border-emerald-200",
+  declinado:            "bg-red-100 text-red-500 border-red-200",
 };
 
 // ── Log helpers ──────────────────────────────────────────────
 
 const CAMPO_CONFIG: Record<string, { label: string; dot: string }> = {
-  status:               { label: "Status",                    dot: "bg-folk" },
-  temperatura:          { label: "Temperatura",               dot: "bg-amber-400" },
-  vendedor:             { label: "Vendedor",                  dot: "bg-blue-400" },
-  valor_implantacao:    { label: "Valor de implantação",       dot: "bg-green-500" },
-  valor_mensal:         { label: "Valor mensal",               dot: "bg-emerald-400" },
-  data_lead:            { label: "Data do lead",              dot: "bg-blue-300" },
-  cliente:              { label: "Cliente",                   dot: "bg-gray-500" },
-  cnpj:                 { label: "CNPJ",                      dot: "bg-gray-400" },
-  sindico_gestor:       { label: "Síndico/Gestor",             dot: "bg-folk" },
-  indicado_por:         { label: "Indicado por",              dot: "bg-amber-400" },
-  observacoes:          { label: "Observações",               dot: "bg-amber-300" },
-  servico_adicionado:   { label: "Serviço adicionado",        dot: "bg-folk" },
-  servico_removido:     { label: "Serviço removido",          dot: "bg-red-400" },
-  conversao:            { label: "Proposta convertida em venda", dot: "bg-emerald-500" },
-  edicao_pos_conversao: { label: "Editado após conversão",    dot: "bg-amber-400" },
+  status:                 { label: "Status",                    dot: "bg-folk" },
+  temperatura:            { label: "Temperatura",               dot: "bg-amber-400" },
+  vendedor:               { label: "Vendedor",                  dot: "bg-blue-400" },
+  valor_implantacao:      { label: "Valor de implantação",       dot: "bg-green-500" },
+  valor_mensal:           { label: "Valor mensal",               dot: "bg-emerald-400" },
+  data_lead:              { label: "Data do lead",              dot: "bg-blue-300" },
+  cliente:                { label: "Cliente",                   dot: "bg-gray-500" },
+  cnpj:                   { label: "CNPJ",                      dot: "bg-gray-400" },
+  sindico_gestor:         { label: "Síndico/Gestor",             dot: "bg-folk" },
+  indicado_por:           { label: "Indicado por",              dot: "bg-amber-400" },
+  observacoes:            { label: "Observações",               dot: "bg-amber-300" },
+  servico_adicionado:     { label: "Serviço adicionado",        dot: "bg-folk" },
+  servico_removido:       { label: "Serviço removido",          dot: "bg-red-400" },
+  conversao:              { label: "Proposta convertida em venda", dot: "bg-emerald-500" },
+  edicao_pos_conversao:   { label: "Editado após conversão",    dot: "bg-amber-400" },
+  proxima_acao_tipo:      { label: "Tipo de ação",              dot: "bg-blue-400" },
+  proxima_acao_datahora:  { label: "Data da próxima ação",      dot: "bg-blue-500" },
+  proxima_acao_descricao: { label: "Observação da ação",        dot: "bg-blue-300" },
+  data_assembleia:        { label: "Data da Assembleia",        dot: "bg-purple-500" },
 };
 
 function formatLogMsg(log: PipelineLog): string {
   switch (log.campo) {
-    case "status":               return `"${log.valor_anterior}" → "${log.valor_novo}"`;
-    case "temperatura":          return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "vendedor":             return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "valor_implantacao":    return `${log.valor_anterior} → ${log.valor_novo}`;
-    case "valor_mensal":         return `${log.valor_anterior} → ${log.valor_novo}`;
     case "servico_adicionado":   return log.valor_novo;
     case "servico_removido":     return log.valor_anterior;
     case "conversao":            return "Proposta convertida em venda";
@@ -115,9 +118,7 @@ function CheckboxServicos({ value, onChange, disabled }: { value: string[]; onCh
   );
 }
 
-function SelectCompetitors({
-  all, selected, onChange,
-}: { all: Competitor[]; selected: string[]; onChange: (ids: string[]) => void }) {
+function SelectCompetitors({ all, selected, onChange }: { all: Competitor[]; selected: string[]; onChange: (ids: string[]) => void }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca]   = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -151,69 +152,37 @@ function SelectCompetitors({
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => { setAberto((o) => !o); setBusca(""); }}
-        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors hover:border-folk/40 focus:border-folk focus:ring-2 focus:ring-folk/10"
-      >
-        <span className={selected.length === 0 ? "text-gray-400" : "text-gray-800"}>
-          {label}
-        </span>
+      <button type="button" onClick={() => { setAberto((o) => !o); setBusca(""); }}
+        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors hover:border-folk/40 focus:border-folk focus:ring-2 focus:ring-folk/10">
+        <span className={selected.length === 0 ? "text-gray-400" : "text-gray-800"}>{label}</span>
         <svg className={`h-4 w-4 text-gray-400 transition-transform ${aberto ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-
-      {/* Dropdown */}
       {aberto && (
         <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
-          {/* Busca */}
           <div className="border-b border-gray-100 px-3 py-2">
-            <input
-              type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar concorrente..."
-              autoFocus
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-1 focus:ring-folk/10"
-            />
+            <input type="text" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar concorrente..." autoFocus
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-1 focus:ring-folk/10" />
           </div>
-
-          {/* Lista */}
           <ul className="max-h-52 overflow-y-auto py-1">
-            {filtrados.length === 0 && (
-              <li className="px-4 py-3 text-xs text-gray-400">Nenhum resultado.</li>
-            )}
+            {filtrados.length === 0 && <li className="px-4 py-3 text-xs text-gray-400">Nenhum resultado.</li>}
             {filtrados.map((c) => {
               const nome = c.trade_name || c.legal_name;
               const marcado = selected.includes(c.id);
               return (
                 <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(c.id)}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 ${marcado ? "bg-folk/5" : ""}`}
-                  >
-                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                      marcado ? "border-folk bg-folk" : "border-gray-300 bg-white"
-                    }`}>
-                      {marcado && (
-                        <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
+                  <button type="button" onClick={() => toggle(c.id)}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 ${marcado ? "bg-folk/5" : ""}`}>
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${marcado ? "border-folk bg-folk" : "border-gray-300 bg-white"}`}>
+                      {marcado && <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                     </span>
-                    <span className={marcado ? "font-medium text-gray-900" : "text-gray-700"}>
-                      {nome}
-                    </span>
+                    <span className={marcado ? "font-medium text-gray-900" : "text-gray-700"}>{nome}</span>
                   </button>
                 </li>
               );
             })}
           </ul>
-
-          {/* Rodapé */}
           {selected.length > 0 && (
             <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
               {selected.length} selecionado{selected.length !== 1 ? "s" : ""}
@@ -225,13 +194,9 @@ function SelectCompetitors({
   );
 }
 
-function SelectSindicoGestor({
-  all, selectedId, onChange, onCadastrarNovo,
-}: {
-  all: SindicoGestor[];
-  selectedId: string;
-  onChange: (id: string) => void;
-  onCadastrarNovo: (buscaAtual: string) => void;
+function SelectSindicoGestor({ all, selectedId, onChange, onCadastrarNovo }: {
+  all: SindicoGestor[]; selectedId: string;
+  onChange: (id: string) => void; onCadastrarNovo: (buscaAtual: string) => void;
 }) {
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
@@ -261,13 +226,7 @@ function SelectSindicoGestor({
             <p className="text-sm font-semibold text-gray-900">{selected.nome}</p>
             <p className="text-xs text-gray-500">{selected.tipo}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="ml-2 shrink-0 text-xs text-gray-400 hover:text-red-500"
-          >
-            ✕
-          </button>
+          <button type="button" onClick={() => onChange("")} className="ml-2 shrink-0 text-xs text-gray-400 hover:text-red-500">✕</button>
         </div>
         {(selected.telefone || selected.email) && (
           <div className="flex flex-col gap-0.5 pl-1 text-xs text-gray-500">
@@ -281,27 +240,16 @@ function SelectSindicoGestor({
 
   return (
     <div ref={ref} className="relative">
-      <input
-        type="text"
-        value={busca}
-        onChange={(e) => { setBusca(e.target.value); setAberto(true); }}
-        onFocus={() => setAberto(true)}
-        placeholder="Pesquisar síndico ou gestor..."
-        className={INPUT}
-      />
+      <input type="text" value={busca} onChange={(e) => { setBusca(e.target.value); setAberto(true); }} onFocus={() => setAberto(true)}
+        placeholder="Pesquisar síndico ou gestor..." className={INPUT} />
       {aberto && (
         <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
           <ul className="max-h-52 overflow-y-auto py-1">
-            {filtrados.length === 0 && (
-              <li className="px-4 py-2.5 text-xs text-gray-400">Nenhum cadastro encontrado.</li>
-            )}
+            {filtrados.length === 0 && <li className="px-4 py-2.5 text-xs text-gray-400">Nenhum cadastro encontrado.</li>}
             {filtrados.map((s) => (
               <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => { onChange(s.id); setBusca(""); setAberto(false); }}
-                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-gray-50"
-                >
+                <button type="button" onClick={() => { onChange(s.id); setBusca(""); setAberto(false); }}
+                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-gray-50">
                   <span className="text-sm font-medium text-gray-900">{s.nome}</span>
                   <span className="text-xs text-gray-400">{s.tipo}</span>
                 </button>
@@ -309,11 +257,8 @@ function SelectSindicoGestor({
             ))}
           </ul>
           <div className="border-t border-gray-100 px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => { setAberto(false); onCadastrarNovo(busca); }}
-              className="text-xs font-semibold text-folk hover:underline"
-            >
+            <button type="button" onClick={() => { setAberto(false); onCadastrarNovo(busca); }}
+              className="text-xs font-semibold text-folk hover:underline">
               + Cadastrar novo síndico/gestor
             </button>
           </div>
@@ -322,6 +267,8 @@ function SelectSindicoGestor({
     </div>
   );
 }
+
+// ── Estado do formulário ─────────────────────────────────────
 
 interface FormState {
   data_inicio_lead: string;
@@ -338,18 +285,32 @@ interface FormState {
   observacoes: string;
   winner_competitor_id: string;
   loss_reason: string;
+  proxima_acao_tipo: string;
+  proxima_acao_datahora: string;
+  proxima_acao_descricao: string;
+  data_assembleia: string;
 }
 
 const FORM_VAZIO: FormState = {
   data_inicio_lead: "", vendedor_id: "", cnpj: "", cliente: "",
   sindico_gestor_id: "",
-  temperatura: "morna", valor_implantacao: "", valor_mensal: "", status: "apresentacao",
+  temperatura: "morna", valor_implantacao: "", valor_mensal: "",
+  status: "lead_cadastrado",
   servicos: [], indicado_por: "", observacoes: "",
   winner_competitor_id: "", loss_reason: "",
+  proxima_acao_tipo: "", proxima_acao_datahora: "", proxima_acao_descricao: "",
+  data_assembleia: "",
 };
 
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
+
+// ── Helpers de filtro por próximas ações ─────────────────────
+
+function getHojeInicio(): Date {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 // ── Componente principal ─────────────────────────────────────
 
@@ -364,6 +325,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro]             = useState<string | null>(null);
   const [view, setView]             = useState<"list" | "form">("list");
+  const [viewMode, setViewMode]     = useState<"kanban" | "tabela">("kanban");
   const [editando, setEditando]     = useState<PipelineItem | null>(null);
   const [form, setForm]             = useState<FormState>(FORM_VAZIO);
   const [salvando, setSalvando]     = useState(false);
@@ -371,6 +333,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [excluindo, setExcluindo]   = useState<string | null>(null);
   const [convertendo, setConvertendo] = useState<string | null>(null);
   const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "", vendedorId: "" });
+  const [filtroAcao, setFiltroAcao] = useState<"" | "atrasadas" | "hoje" | "semana" | "sem_acao">("");
   const [buscaCliente, setBuscaCliente] = useState("");
   const [logs, setLogs]             = useState<PipelineLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
@@ -380,6 +343,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
   const [competitorIds, setCompetitorIds]   = useState<string[]>([]);
   const [allSindicosGestores, setAllSindicosGestores] = useState<SindicoGestor[]>([]);
+  const [salvandoAgenda, setSalvandoAgenda] = useState(false);
+  const [agendaRegistrada, setAgendaRegistrada] = useState(false);
   const [modalSindico, setModalSindico] = useState<{
     aberto: boolean; nome: string; telefone: string; email: string;
     tipo: TipoSindicoGestor; salvando: boolean; erro: string | null;
@@ -438,26 +403,44 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setLogs([]);
     setCompetitorIds([]); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
     setModalSindico((p) => ({ ...p, aberto: false }));
+    setAgendaRegistrada(false);
     markClean(); setView("form");
   }
+
   function abrirEditar(r: PipelineItem) {
     setEditando(r);
     setForm({
-      data_inicio_lead: r.data_inicio_lead, vendedor_id: r.vendedor_id ?? "",
+      data_inicio_lead: r.data_inicio_lead,
+      vendedor_id: r.vendedor_id ?? "",
       cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "",
-      cliente: r.cliente, temperatura: r.temperatura,
+      cliente: r.cliente,
+      temperatura: r.temperatura,
       sindico_gestor_id: r.sindico_gestor_id ?? "",
-      valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal),
-      status: r.status, servicos: r.servicos ?? [], indicado_por: r.indicado_por,
+      valor_implantacao: String(r.valor_implantacao),
+      valor_mensal: String(r.valor_mensal),
+      status: r.status,
+      servicos: r.servicos ?? [],
+      indicado_por: r.indicado_por,
       observacoes: r.observacoes,
       winner_competitor_id: r.winner_competitor_id ?? "",
       loss_reason: r.loss_reason ?? "",
+      proxima_acao_tipo: r.proxima_acao_tipo ?? "",
+      proxima_acao_datahora: r.proxima_acao_datahora
+        ? new Date(r.proxima_acao_datahora).toISOString().slice(0, 16)
+        : "",
+      proxima_acao_descricao: r.proxima_acao_descricao ?? "",
+      data_assembleia: r.data_assembleia
+        ? new Date(r.data_assembleia).toISOString().slice(0, 16)
+        : "",
     });
     setCompetitorIds([]);
-    setErroForm(null); setErroCNPJ(null); setNomeFantasiaCNPJ(null); markClean(); setView("form");
+    setErroForm(null); setErroCNPJ(null); setNomeFantasiaCNPJ(null);
+    setAgendaRegistrada(false);
+    markClean(); setView("form");
     carregarLogs(r.id);
     listarOpportunityCompetitors(r.id).then(setCompetitorIds).catch(() => {});
   }
+
   function cancelar() {
     guardCancel(() => {
       setView("list"); setEditando(null); setErroForm(null); setLogs([]);
@@ -465,6 +448,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       setModalSindico((p) => ({ ...p, aberto: false }));
     });
   }
+
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
 
   async function buscarRazaoSocial(cnpjMascarado: string) {
@@ -511,20 +495,31 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     setSalvando(true); setErroForm(null);
     try {
       const payload: PipelinePayload = {
-        data_inicio_lead:  form.data_inicio_lead,
-        vendedor_id:       form.vendedor_id || null,
-        cnpj:              form.cnpj.replace(/\D/g, ""),
-        cliente:           form.cliente.trim(),
-        sindico_gestor_id: form.sindico_gestor_id || null,
-        temperatura:       form.temperatura,
-        valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
-        valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
-        status:            form.status,
-        servicos:          form.servicos,
-        indicado_por:      form.indicado_por.trim(),
-        observacoes:       form.observacoes.trim(),
-        winner_competitor_id: form.winner_competitor_id || null,
-        loss_reason:          form.loss_reason.trim(),
+        data_inicio_lead:      form.data_inicio_lead,
+        vendedor_id:           form.vendedor_id || null,
+        cnpj:                  form.cnpj.replace(/\D/g, ""),
+        cliente:               form.cliente.trim(),
+        sindico_gestor_id:     form.sindico_gestor_id || null,
+        temperatura:           form.temperatura,
+        valor_implantacao:     parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
+        valor_mensal:          parseFloat(form.valor_mensal.replace(",", ".")) || 0,
+        status:                form.status,
+        servicos:              form.servicos,
+        indicado_por:          form.indicado_por.trim(),
+        observacoes:           form.observacoes.trim(),
+        winner_competitor_id:  form.winner_competitor_id || null,
+        loss_reason:           form.loss_reason.trim(),
+        proxima_acao_tipo:     form.proxima_acao_tipo || null,
+        proxima_acao_datahora: form.proxima_acao_datahora
+          ? new Date(form.proxima_acao_datahora).toISOString()
+          : null,
+        proxima_acao_descricao: form.proxima_acao_descricao.trim(),
+        data_assembleia: form.data_assembleia
+          ? new Date(form.data_assembleia).toISOString()
+          : null,
+        ultima_interacao:       editando?.ultima_interacao ?? null,
+        google_event_id:        editando?.google_event_id ?? null,
+        google_sync_status:     editando?.google_sync_status ?? "nao_sincronizado",
       };
       let savedId: string;
       if (editando) {
@@ -560,13 +555,56 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     onConverter(item);
   }
 
-  const ativos = registros.filter((r) => !["fechado_ganho", "declinado"].includes(r.status));
+  async function handleMoverCard(itemId: string, novoStatus: StatusPipeline, statusAnterior: StatusPipeline) {
+    setRegistros((prev) => prev.map((r) => r.id === itemId ? { ...r, status: novoStatus } : r));
+    try {
+      await atualizarStatusPipeline(itemId, novoStatus, statusAnterior);
+    } catch {
+      setRegistros((prev) => prev.map((r) => r.id === itemId ? { ...r, status: statusAnterior } : r));
+      setErro("Erro ao mover card. Tente novamente.");
+    }
+  }
+
+  async function handleRegistrarAgenda() {
+    if (!editando) return;
+    setSalvandoAgenda(true);
+    try {
+      await registrarIntencaoAgenda(editando.id, form.vendedor_id || null);
+      setAgendaRegistrada(true);
+      setTimeout(() => setAgendaRegistrada(false), 4000);
+    } catch {
+      // best-effort
+    } finally {
+      setSalvandoAgenda(false);
+    }
+  }
+
+  // ── Estatísticas e filtros ──────────────────────────────────
+
+  const ativos = registros.filter((r) => !["fechado", "declinado"].includes(r.status));
 
   const statsPorTemp = {
     quente: ativos.filter((r) => r.temperatura === "quente"),
     morna:  ativos.filter((r) => r.temperatura === "morna"),
     fria:   ativos.filter((r) => r.temperatura === "fria"),
   };
+
+  const hojeInicio = useMemo(getHojeInicio, []);
+  const amanha     = useMemo(() => { const d = new Date(hojeInicio); d.setDate(d.getDate() + 1); return d; }, [hojeInicio]);
+  const em7Dias    = useMemo(() => { const d = new Date(hojeInicio); d.setDate(d.getDate() + 7); return d; }, [hojeInicio]);
+
+  const acoesAtrasadas = ativos.filter(r => r.proxima_acao_datahora && new Date(r.proxima_acao_datahora) < hojeInicio);
+  const acoesHoje      = ativos.filter(r => {
+    if (!r.proxima_acao_datahora) return false;
+    const d = new Date(r.proxima_acao_datahora);
+    return d >= hojeInicio && d < amanha;
+  });
+  const acoesSemana = ativos.filter(r => {
+    if (!r.proxima_acao_datahora) return false;
+    const d = new Date(r.proxima_acao_datahora);
+    return d >= amanha && d < em7Dias;
+  });
+  const semProximaAcao = ativos.filter(r => !r.proxima_acao_datahora);
 
   const busca = buscaCliente.toLowerCase().trim();
   const buscaDigits = busca.replace(/\D/g, "");
@@ -579,10 +617,17 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       const matchCNPJ = buscaDigits.length >= 3 && (r.cnpj ?? "").includes(buscaDigits);
       if (!matchCliente && !matchCNPJ) return false;
     }
+    if (filtroAcao) {
+      const d = r.proxima_acao_datahora ? new Date(r.proxima_acao_datahora) : null;
+      if (filtroAcao === "atrasadas" && (!d || d >= hojeInicio)) return false;
+      if (filtroAcao === "hoje"      && (!d || d < hojeInicio || d >= amanha)) return false;
+      if (filtroAcao === "semana"    && (!d || d < amanha || d >= em7Dias)) return false;
+      if (filtroAcao === "sem_acao"  && !!r.proxima_acao_datahora) return false;
+    }
     return true;
   });
 
-  const propostasAtivas     = registrosExibidos.filter((r) => !["fechado_ganho", "declinado"].includes(r.status));
+  const propostasAtivas     = registrosExibidos.filter((r) => !["fechado", "declinado"].includes(r.status));
   const propostasDeclinadas = registrosExibidos.filter((r) => r.status === "declinado");
   const totalImplantacao    = propostasAtivas.reduce((acc, r) => acc + r.valor_implantacao, 0);
   const totalMensal         = propostasAtivas.reduce((acc, r) => acc + r.valor_mensal, 0);
@@ -598,7 +643,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
         </div>
 
         {editando?.convertido_em_venda && (
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <span className="mt-0.5 text-amber-500">⚠</span>
             <div>
               <p className="text-sm font-semibold text-amber-800">Esta proposta já foi convertida em venda.</p>
@@ -606,54 +651,46 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
           </div>
         )}
+
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {/* Dados básicos */}
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Início do lead *</label>
               <input type="date" value={form.data_inicio_lead} onChange={(e) => set("data_inicio_lead", e.target.value)} required className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => {
-                  const val = e.target.value as StatusPipeline;
-                  if (val === "declinado" && form.status !== "declinado") {
-                    setModalDeclinado({ aberto: true, winner_competitor_id: "", loss_reason: "", erro: null });
-                  } else {
-                    set("status", val);
-                    if (val !== "declinado") {
-                      setForm((p) => ({ ...p, status: val, winner_competitor_id: "", loss_reason: "" }));
-                      markDirty();
-                    }
+              <select value={form.status} onChange={(e) => {
+                const val = e.target.value as StatusPipeline;
+                if (val === "declinado" && form.status !== "declinado") {
+                  setModalDeclinado({ aberto: true, winner_competitor_id: "", loss_reason: "", erro: null });
+                } else {
+                  set("status", val);
+                  if (val !== "declinado") {
+                    setForm((p) => ({ ...p, status: val, winner_competitor_id: "", loss_reason: "" }));
+                    markDirty();
                   }
-                }}
-                className={INPUT}
-              >
+                }
+              }} className={INPUT}>
                 {STATUS_PIPELINE.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>CNPJ</label>
-              <input
-                type="text"
-                value={form.cnpj}
-                onChange={(e) => {
-                  const formatted = formatarCNPJ(e.target.value);
-                  set("cnpj", formatted);
-                  setErroCNPJ(null);
-                  if (formatted.replace(/\D/g, "").length === 14) buscarRazaoSocial(formatted);
-                }}
-                placeholder="00.000.000/0000-00"
-                inputMode="numeric"
-                className={INPUT}
-              />
+              <input type="text" value={form.cnpj} onChange={(e) => {
+                const formatted = formatarCNPJ(e.target.value);
+                set("cnpj", formatted); setErroCNPJ(null);
+                if (formatted.replace(/\D/g, "").length === 14) buscarRazaoSocial(formatted);
+              }} placeholder="00.000.000/0000-00" inputMode="numeric" className={INPUT} />
               {buscandoCNPJ && <p className="text-[11px] text-gray-400">Buscando razão social...</p>}
               {erroCNPJ && <p className="text-[11px] text-amber-600">{erroCNPJ}</p>}
               {nomeFantasiaCNPJ && !erroCNPJ && (
                 <p className="text-[11px] text-gray-500">Nome Fantasia: <span className="font-medium">{nomeFantasiaCNPJ}</span></p>
               )}
             </div>
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Cliente *</label>
               <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente"
@@ -661,6 +698,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
+
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Vendedor</label>
               <select value={form.vendedor_id} onChange={(e) => set("vendedor_id", e.target.value)} className={INPUT}>
@@ -678,6 +716,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 {TEMPERATURAS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
+
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Implantação (R$)</label>
               <input type="number" min="0" step="0.01" value={form.valor_implantacao} onChange={(e) => set("valor_implantacao", e.target.value)} placeholder="0,00"
@@ -692,64 +731,107 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 className={`${INPUT} disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
-            <div className="flex flex-col gap-1.5">
+
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Síndico / Gestor</label>
               <SelectSindicoGestor
-                all={allSindicosGestores}
-                selectedId={form.sindico_gestor_id}
-                onChange={(id) => { set("sindico_gestor_id", id); }}
-                onCadastrarNovo={(busca) =>
-                  setModalSindico({ aberto: true, nome: busca, telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })
-                }
+                all={allSindicosGestores} selectedId={form.sindico_gestor_id}
+                onChange={(id) => set("sindico_gestor_id", id)}
+                onCadastrarNovo={(b) => setModalSindico({ aberto: true, nome: b, telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })}
               />
             </div>
+
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Serviços</label>
               <CheckboxServicos value={form.servicos} onChange={(v) => set("servicos", v)} disabled={!!editando?.convertido_em_venda} />
               {editando?.convertido_em_venda && <p className="text-[11px] text-amber-600">Campo bloqueado após conversão em venda.</p>}
             </div>
+
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className={LABEL}>Concorrentes envolvidos</label>
-              <SelectCompetitors
-                all={allCompetitors}
-                selected={competitorIds}
-                onChange={(ids) => { setCompetitorIds(ids); markDirty(); }}
-              />
+              <SelectCompetitors all={allCompetitors} selected={competitorIds} onChange={(ids) => { setCompetitorIds(ids); markDirty(); }} />
             </div>
 
-            {/* Motivo de perda — visível só quando declinado */}
             {form.status === "declinado" && (
               <>
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>Concorrente vencedor</label>
-                  <select
-                    value={form.winner_competitor_id}
-                    onChange={(e) => set("winner_competitor_id", e.target.value)}
-                    className={INPUT}
-                  >
+                  <select value={form.winner_competitor_id} onChange={(e) => set("winner_competitor_id", e.target.value)} className={INPUT}>
                     <option value="">Sem concorrente / não identificado</option>
-                    {allCompetitors.map((c) => (
+                    {allCompetitors.filter((c) => competitorIds.includes(c.id)).map((c) => (
+                      <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                    ))}
+                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).length > 0 && <option disabled>──────────</option>}
+                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).map((c) => (
                       <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>Motivo da perda</label>
-                  <input
-                    type="text"
-                    value={form.loss_reason}
-                    onChange={(e) => set("loss_reason", e.target.value)}
-                    placeholder="Breve descrição do motivo"
-                    className={INPUT}
-                  />
+                  <input type="text" value={form.loss_reason} onChange={(e) => set("loss_reason", e.target.value)} placeholder="Breve descrição do motivo" className={INPUT} />
                 </div>
               </>
             )}
+
+            {/* Campo data_assembleia — visível apenas no status Assembleia Marcada */}
+            {form.status === "assembleia_marcada" && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-purple-700">📅 Data da Assembleia</label>
+                <input
+                  type="datetime-local"
+                  value={form.data_assembleia}
+                  onChange={(e) => set("data_assembleia", e.target.value)}
+                  className="rounded-xl border border-purple-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 w-full"
+                />
+                <p className="text-[11px] text-purple-600">Data e hora em que a assembleia está agendada para ocorrer.</p>
+              </div>
+            )}
+
+            {/* ── ACOMPANHAMENTO COMERCIAL ── */}
+            <div className="sm:col-span-2">
+              <div className="border-t border-gray-100 pt-5">
+                <h3 className="mb-4 text-xs font-bold uppercase tracking-wide text-gray-500">Acompanhamento Comercial</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label className={LABEL}>Próxima ação</label>
+                    <select value={form.proxima_acao_tipo} onChange={(e) => set("proxima_acao_tipo", e.target.value)} className={INPUT}>
+                      <option value="">Selecione...</option>
+                      {PROXIMA_ACAO_TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className={LABEL}>Data / Hora</label>
+                    <input type="datetime-local" value={form.proxima_acao_datahora} onChange={(e) => set("proxima_acao_datahora", e.target.value)} className={INPUT} />
+                  </div>
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <label className={LABEL}>Observações da ação</label>
+                    <textarea value={form.proxima_acao_descricao} onChange={(e) => set("proxima_acao_descricao", e.target.value)} rows={2}
+                      placeholder="Detalhes sobre a próxima ação..." className={`${INPUT} resize-none`} />
+                  </div>
+
+                  {/* Botão Adicionar à Agenda */}
+                  {editando && (
+                    <div className="sm:col-span-2 flex items-center gap-3">
+                      <button type="button" onClick={handleRegistrarAgenda} disabled={salvandoAgenda}
+                        className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                        <span>📅</span>
+                        {salvandoAgenda ? "Registrando..." : "Adicionar à Agenda"}
+                      </button>
+                      {agendaRegistrada && (
+                        <p className="text-xs text-emerald-600 font-medium">✓ Intenção de sincronização registrada.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className={LABEL}>Observações</label>
               <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3} placeholder="Informações adicionais sobre a proposta..." className={`${INPUT} resize-none`} />
             </div>
+
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
             <div className="flex gap-3 sm:col-span-2">
               <button type="submit" disabled={salvando} className="rounded-2xl bg-folk-gradient px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-60">
@@ -760,79 +842,49 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           </form>
         </Card>
 
-        {/* ── Modal: Registrar motivo da perda ── */}
+        {/* Modal: Registrar motivo da perda */}
         {modalDeclinado.aberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
               <div className="border-b border-gray-100 px-6 py-4">
                 <h3 className="text-base font-bold text-gray-900">Registrar motivo da perda</h3>
-                <p className="mt-0.5 text-sm text-gray-500">
-                  Informe o concorrente que venceu esta oportunidade, se houver.
-                </p>
+                <p className="mt-0.5 text-sm text-gray-500">Informe o concorrente que venceu esta oportunidade, se houver.</p>
               </div>
               <div className="grid grid-cols-1 gap-4 px-6 py-5">
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>Concorrente vencedor</label>
-                  <select
-                    value={modalDeclinado.winner_competitor_id}
-                    onChange={(e) =>
-                      setModalDeclinado((p) => ({ ...p, winner_competitor_id: e.target.value, erro: null }))
-                    }
-                    className={INPUT}
-                  >
+                  <select value={modalDeclinado.winner_competitor_id}
+                    onChange={(e) => setModalDeclinado((p) => ({ ...p, winner_competitor_id: e.target.value, erro: null }))}
+                    className={INPUT}>
                     <option value="">Sem concorrente / não identificado</option>
-                    {/* Linked competitors first */}
-                    {allCompetitors
-                      .filter((c) => competitorIds.includes(c.id))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
-                      ))}
-                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).length > 0 && (
-                      <option disabled>──────────</option>
-                    )}
-                    {allCompetitors
-                      .filter((c) => !competitorIds.includes(c.id))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
-                      ))}
+                    {allCompetitors.filter((c) => competitorIds.includes(c.id)).map((c) => (
+                      <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                    ))}
+                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).length > 0 && <option disabled>──────────</option>}
+                    {allCompetitors.filter((c) => !competitorIds.includes(c.id)).map((c) => (
+                      <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>Observação</label>
-                  <input
-                    type="text"
-                    value={modalDeclinado.loss_reason}
-                    onChange={(e) =>
-                      setModalDeclinado((p) => ({ ...p, loss_reason: e.target.value }))
-                    }
-                    placeholder="Motivo, preço, relacionamento..."
-                    className={INPUT}
-                  />
+                  <input type="text" value={modalDeclinado.loss_reason}
+                    onChange={(e) => setModalDeclinado((p) => ({ ...p, loss_reason: e.target.value }))}
+                    placeholder="Motivo, preço, relacionamento..." className={INPUT} />
                 </div>
                 {modalDeclinado.erro && <Alert status="error" message={modalDeclinado.erro} />}
               </div>
               <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setModalDeclinado({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null })}
-                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300"
-                >
+                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300">
                   Cancelar
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm((p) => ({
-                      ...p,
-                      status: "declinado" as StatusPipeline,
-                      winner_competitor_id: modalDeclinado.winner_competitor_id,
-                      loss_reason: modalDeclinado.loss_reason,
-                    }));
-                    markDirty();
-                    setModalDeclinado({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null });
-                  }}
-                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm"
-                >
+                <button type="button" onClick={() => {
+                  setForm((p) => ({ ...p, status: "declinado" as StatusPipeline, winner_competitor_id: modalDeclinado.winner_competitor_id, loss_reason: modalDeclinado.loss_reason }));
+                  markDirty();
+                  setModalDeclinado({ aberto: false, winner_competitor_id: "", loss_reason: "", erro: null });
+                }} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm">
                   Confirmar
                 </button>
               </div>
@@ -840,7 +892,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           </div>
         )}
 
-        {/* ── Modal: Cadastro rápido de síndico/gestor ── */}
+        {/* Modal: Cadastro rápido de síndico/gestor */}
         {modalSindico.aberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
@@ -851,65 +903,29 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <label className={LABEL}>Nome *</label>
-                  <input
-                    type="text"
-                    value={modalSindico.nome}
-                    onChange={(e) => setModalSindico((p) => ({ ...p, nome: e.target.value, erro: null }))}
-                    placeholder="Nome completo"
-                    autoFocus
-                    className={INPUT}
-                  />
+                  <input type="text" value={modalSindico.nome} onChange={(e) => setModalSindico((p) => ({ ...p, nome: e.target.value, erro: null }))} placeholder="Nome completo" autoFocus className={INPUT} />
                 </div>
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <label className={LABEL}>Tipo *</label>
-                  <select
-                    value={modalSindico.tipo}
-                    onChange={(e) => setModalSindico((p) => ({ ...p, tipo: e.target.value as TipoSindicoGestor }))}
-                    className={INPUT}
-                  >
-                    {TIPOS_SINDICO_GESTOR.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
+                  <select value={modalSindico.tipo} onChange={(e) => setModalSindico((p) => ({ ...p, tipo: e.target.value as TipoSindicoGestor }))} className={INPUT}>
+                    {TIPOS_SINDICO_GESTOR.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>Telefone</label>
-                  <input
-                    type="tel"
-                    value={modalSindico.telefone}
-                    onChange={(e) => setModalSindico((p) => ({ ...p, telefone: e.target.value }))}
-                    placeholder="(00) 00000-0000"
-                    className={INPUT}
-                  />
+                  <input type="tel" value={modalSindico.telefone} onChange={(e) => setModalSindico((p) => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" className={INPUT} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className={LABEL}>E-mail</label>
-                  <input
-                    type="email"
-                    value={modalSindico.email}
-                    onChange={(e) => setModalSindico((p) => ({ ...p, email: e.target.value }))}
-                    placeholder="email@exemplo.com"
-                    className={INPUT}
-                  />
+                  <input type="email" value={modalSindico.email} onChange={(e) => setModalSindico((p) => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className={INPUT} />
                 </div>
-                {modalSindico.erro && (
-                  <div className="sm:col-span-2"><Alert status="error" message={modalSindico.erro} /></div>
-                )}
+                {modalSindico.erro && <div className="sm:col-span-2"><Alert status="error" message={modalSindico.erro} /></div>}
               </div>
               <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => setModalSindico({ aberto: false, nome: "", telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })}
-                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={criarSindicoRapido}
-                  disabled={modalSindico.salvando}
-                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
-                >
+                <button type="button" onClick={() => setModalSindico({ aberto: false, nome: "", telefone: "", email: "", tipo: "Síndico Morador", salvando: false, erro: null })}
+                  className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300">Cancelar</button>
+                <button type="button" onClick={criarSindicoRapido} disabled={modalSindico.salvando}
+                  className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60">
                   {modalSindico.salvando ? "Salvando..." : "Salvar"}
                 </button>
               </div>
@@ -917,22 +933,17 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           </div>
         )}
 
-        {/* Histórico — só aparece na edição */}
+        {/* Histórico */}
         {editando && (
           <Card className="p-6">
             <h3 className="mb-4 text-sm font-semibold text-gray-800">Histórico de alterações</h3>
-
             {carregandoLogs && <p className="text-sm text-gray-400">Carregando...</p>}
-
-            {!carregandoLogs && logsVisiveis.length === 0 && (
-              <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
-            )}
-
+            {!carregandoLogs && logsVisiveis.length === 0 && <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>}
             {!carregandoLogs && logsVisiveis.length > 0 && (
               <div>
                 {logsVisiveis.map((log, i) => {
                   const cfg = CAMPO_CONFIG[log.campo] ?? { label: log.campo, dot: "bg-gray-300" };
-                  const isConversao = log.campo === "conversao";
+                  const isConversao    = log.campo === "conversao";
                   const isPosConversao = log.campo === "edicao_pos_conversao";
                   return (
                     <div key={log.id} className="flex gap-3">
@@ -967,43 +978,59 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     );
   }
 
-  // ── Listagem ───────────────────────────────────────────────
+  // ── Visualização (Kanban / Tabela) ─────────────────────────
 
   return (
     <div>
-      {/* ── Cards de resumo ── */}
-      {!carregando && ativos.length > 0 && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* ── Dashboard superior ── */}
+      {!carregando && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           {([
             { label: "Quente",  items: statsPorTemp.quente, cls: "border-red-200 bg-red-50",    txt: "text-red-700" },
             { label: "Morna",   items: statsPorTemp.morna,  cls: "border-amber-200 bg-amber-50", txt: "text-amber-700" },
             { label: "Fria",    items: statsPorTemp.fria,   cls: "border-blue-200 bg-blue-50",   txt: "text-blue-700" },
-            { label: "Total ativo", items: ativos,          cls: "border-gray-200 bg-gray-50",   txt: "text-gray-700" },
+            { label: "Total",   items: ativos,              cls: "border-gray-200 bg-gray-50",   txt: "text-gray-700" },
           ] as const).map(({ label, items, cls, txt }) => (
-            <div key={label} className={`rounded-2xl border px-4 py-3 ${cls}`}>
-              <p className={`text-xs font-semibold uppercase tracking-wide ${txt} mb-1`}>{label}</p>
-              <p className={`text-2xl font-bold ${txt}`}>{items.length}</p>
-              {items.reduce((s, r) => s + r.valor_mensal, 0) > 0 && (
-                <p className={`text-xs font-medium ${txt} mt-0.5 opacity-80`}>
-                  {formatMoeda(items.reduce((s, r) => s + r.valor_mensal, 0))}/mês
-                </p>
-              )}
+            <div key={label} className={`rounded-2xl border px-3 py-2.5 ${cls}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wide ${txt} mb-0.5`}>{label}</p>
+              <p className={`text-xl font-bold ${txt}`}>{items.length}</p>
             </div>
           ))}
+          <div className={`rounded-2xl border px-3 py-2.5 ${acoesAtrasadas.length > 0 ? "border-red-200 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${acoesAtrasadas.length > 0 ? "text-red-600" : "text-gray-500"}`}>Atrasadas</p>
+            <p className={`text-xl font-bold ${acoesAtrasadas.length > 0 ? "text-red-600" : "text-gray-600"}`}>{acoesAtrasadas.length}</p>
+          </div>
+          <div className={`rounded-2xl border px-3 py-2.5 ${acoesHoje.length > 0 ? "border-amber-200 bg-amber-50" : "border-gray-200 bg-gray-50"}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${acoesHoje.length > 0 ? "text-amber-700" : "text-gray-500"}`}>Hoje</p>
+            <p className={`text-xl font-bold ${acoesHoje.length > 0 ? "text-amber-700" : "text-gray-600"}`}>{acoesHoje.length}</p>
+          </div>
+          <div className={`rounded-2xl border px-3 py-2.5 ${acoesSemana.length > 0 ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50"}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${acoesSemana.length > 0 ? "text-blue-700" : "text-gray-500"}`}>7 dias</p>
+            <p className={`text-xl font-bold ${acoesSemana.length > 0 ? "text-blue-700" : "text-gray-600"}`}>{acoesSemana.length}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltroAcao(filtroAcao === "sem_acao" ? "" : "sem_acao")}
+            className={`rounded-2xl border px-3 py-2.5 text-left transition-colors ${
+              filtroAcao === "sem_acao"
+                ? "border-orange-300 bg-orange-100"
+                : semProximaAcao.length > 0
+                ? "border-orange-200 bg-orange-50 hover:border-orange-300"
+                : "border-gray-200 bg-gray-50 hover:border-gray-300"
+            }`}
+          >
+            <p className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${semProximaAcao.length > 0 ? "text-orange-700" : "text-gray-500"}`}>Sem ação</p>
+            <p className={`text-xl font-bold ${semProximaAcao.length > 0 ? "text-orange-700" : "text-gray-600"}`}>{semProximaAcao.length}</p>
+          </button>
         </div>
       )}
 
-      <Card className="mb-5 p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ── Filtros ── */}
+      <Card className="mb-4 p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
             <label className={LABEL}>Buscar</label>
-            <input
-              type="text"
-              value={buscaCliente}
-              onChange={(e) => setBuscaCliente(e.target.value)}
-              placeholder="Nome do cliente ou CNPJ..."
-              className={INPUT}
-            />
+            <input type="text" value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} placeholder="Nome do cliente ou CNPJ..." className={INPUT} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className={LABEL}>Temperatura</label>
@@ -1027,11 +1054,34 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </select>
           </div>
         </div>
+
+        {/* Filtros de ação */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Ações:</span>
+          {([
+            { key: "atrasadas", label: "Atrasadas",   cls: "border-red-200 text-red-600 hover:bg-red-50",       active: "bg-red-100 border-red-300 text-red-700" },
+            { key: "hoje",      label: "Hoje",         cls: "border-amber-200 text-amber-600 hover:bg-amber-50", active: "bg-amber-100 border-amber-300 text-amber-700" },
+            { key: "semana",    label: "Esta semana",  cls: "border-blue-200 text-blue-600 hover:bg-blue-50",    active: "bg-blue-100 border-blue-300 text-blue-700" },
+            { key: "sem_acao",  label: "Sem próxima ação", cls: "border-orange-200 text-orange-600 hover:bg-orange-50", active: "bg-orange-100 border-orange-300 text-orange-700" },
+          ] as const).map(({ key, label, cls, active }) => (
+            <button key={key} type="button"
+              onClick={() => setFiltroAcao(filtroAcao === key ? "" : key)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${filtroAcao === key ? active : `bg-white ${cls}`}`}>
+              {label}
+            </button>
+          ))}
+          {filtroAcao && (
+            <button type="button" onClick={() => setFiltroAcao("")} className="text-xs text-gray-400 hover:text-gray-600">✕ Limpar</button>
+          )}
+        </div>
       </Card>
 
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${propostasAtivas.length} proposta${propostasAtivas.length !== 1 ? "s" : ""}${propostasDeclinadas.length > 0 ? ` · ${propostasDeclinadas.length} declinada${propostasDeclinadas.length !== 1 ? "s" : ""}` : ""}`}</p>
+      {/* ── Barra de ações ── */}
+      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-sm text-gray-500">
+            {carregando ? "Carregando..." : `${propostasAtivas.length} ativa${propostasAtivas.length !== 1 ? "s" : ""}${propostasDeclinadas.length > 0 ? ` · ${propostasDeclinadas.length} declinada${propostasDeclinadas.length !== 1 ? "s" : ""}` : ""}`}
+          </p>
           {propostasAtivas.length > 0 && (
             <div className="flex items-center gap-3 text-sm font-semibold text-gray-700">
               {totalImplantacao > 0 && <span>Implantação: <span className="text-folk">{formatMoeda(totalImplantacao)}</span></span>}
@@ -1040,55 +1090,76 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
             </div>
           )}
         </div>
-        <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
-          + Nova proposta
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Toggle de visualização */}
+          <div className="flex gap-0.5 rounded-xl border border-gray-200 bg-white p-0.5">
+            <button onClick={() => setViewMode("kanban")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${viewMode === "kanban" ? "bg-folk text-white" : "text-gray-500 hover:text-gray-700"}`}>
+              Kanban
+            </button>
+            <button onClick={() => setViewMode("tabela")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${viewMode === "tabela" ? "bg-folk text-white" : "text-gray-500 hover:text-gray-700"}`}>
+              Lista
+            </button>
+          </div>
+          <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
+            + Nova proposta
+          </button>
+        </div>
       </div>
 
       {erro && <Alert status="error" message={erro} />}
 
       {!carregando && registrosExibidos.length === 0 && !erro && (
-        <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">Nenhuma proposta no pipeline.</div>
+        <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center text-sm text-gray-400">
+          Nenhuma proposta no pipeline.
+        </div>
       )}
 
-      {registrosExibidos.length > 0 && (
+      {/* ── Kanban ── */}
+      {viewMode === "kanban" && registrosExibidos.length > 0 && (
+        <KanbanPipeline
+          registros={registrosExibidos}
+          allCompetitors={allCompetitors}
+          allSindicosGestores={allSindicosGestores}
+          excluindo={excluindo}
+          convertendo={convertendo}
+          onEditar={abrirEditar}
+          onExcluir={handleExcluir}
+          onConverter={handleConverter}
+          onIrParaVendas={onIrParaVendas}
+          onMoverCard={handleMoverCard}
+        />
+      )}
+
+      {/* ── Lista ── */}
+      {viewMode === "tabela" && registrosExibidos.length > 0 && (
         <div className="flex flex-col gap-3">
           {propostasAtivas.map((r) => (
             <PropostaCard
-              key={r.id}
-              r={r}
-              allCompetitors={allCompetitors}
-              allSindicosGestores={allSindicosGestores}
-              excluindo={excluindo}
-              convertendo={convertendo}
-              onEditar={abrirEditar}
-              onExcluir={handleExcluir}
-              onConverter={handleConverter}
-              onIrParaVendas={onIrParaVendas}
+              key={r.id} r={r}
+              allCompetitors={allCompetitors} allSindicosGestores={allSindicosGestores}
+              excluindo={excluindo} convertendo={convertendo}
+              onEditar={abrirEditar} onExcluir={handleExcluir}
+              onConverter={handleConverter} onIrParaVendas={onIrParaVendas}
             />
           ))}
-
           {propostasDeclinadas.length > 0 && (
             <>
               {propostasAtivas.length > 0 && (
                 <div className="mt-2 flex items-center gap-3">
                   <div className="flex-1 border-t border-dashed border-gray-200" />
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Propostas Declinadas</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Declinadas</p>
                   <div className="flex-1 border-t border-dashed border-gray-200" />
                 </div>
               )}
               {propostasDeclinadas.map((r) => (
                 <PropostaCard
-                  key={r.id}
-                  r={r}
-                  allCompetitors={allCompetitors}
-                  allSindicosGestores={allSindicosGestores}
-                  excluindo={excluindo}
-                  convertendo={convertendo}
-                  onEditar={abrirEditar}
-                  onExcluir={handleExcluir}
-                  onConverter={handleConverter}
-                  onIrParaVendas={onIrParaVendas}
+                  key={r.id} r={r}
+                  allCompetitors={allCompetitors} allSindicosGestores={allSindicosGestores}
+                  excluindo={excluindo} convertendo={convertendo}
+                  onEditar={abrirEditar} onExcluir={handleExcluir}
+                  onConverter={handleConverter} onIrParaVendas={onIrParaVendas}
                 />
               ))}
             </>
@@ -1098,6 +1169,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     </div>
   );
 }
+
+// ── PropostaCard (vista lista) ────────────────────────────────
 
 function PropostaCard({
   r, allCompetitors, allSindicosGestores, excluindo, convertendo,
@@ -1114,15 +1187,27 @@ function PropostaCard({
   onIrParaVendas: () => void;
 }) {
   const winnerName = r.winner_competitor_id
-    ? (() => {
-        const c = allCompetitors.find((x) => x.id === r.winner_competitor_id);
-        return c ? (c.trade_name || c.legal_name) : null;
-      })()
+    ? (() => { const c = allCompetitors.find((x) => x.id === r.winner_competitor_id); return c ? (c.trade_name || c.legal_name) : null; })()
     : null;
+  const sindico = r.sindico_gestor_id ? allSindicosGestores.find((s) => s.id === r.sindico_gestor_id) ?? null : null;
 
-  const sindico = r.sindico_gestor_id
-    ? allSindicosGestores.find((s) => s.id === r.sindico_gestor_id) ?? null
-    : null;
+  // Indicador de próxima ação
+  const agora = new Date();
+  const hoje  = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1);
+  let acaoInfo: { texto: string; cls: string } | null = null;
+  if (r.proxima_acao_datahora) {
+    const d = new Date(r.proxima_acao_datahora);
+    if (d < hoje) {
+      const dias = Math.max(1, Math.floor((hoje.getTime() - d.getTime()) / 86_400_000));
+      acaoInfo = { texto: `Ação atrasada há ${dias} dia${dias !== 1 ? "s" : ""}`, cls: "text-red-600 bg-red-50 border-red-200" };
+    } else if (d < amanha) {
+      acaoInfo = { texto: `Ação para hoje · ${r.proxima_acao_tipo || ""}`.trim().replace(/·\s*$/, ""), cls: "text-amber-600 bg-amber-50 border-amber-200" };
+    } else {
+      const dtFmt = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      acaoInfo = { texto: `${r.proxima_acao_tipo ? r.proxima_acao_tipo + " · " : ""}${dtFmt}`, cls: "text-green-700 bg-green-50 border-green-200" };
+    }
+  }
 
   return (
     <div className={`rounded-2xl border border-gray-200 bg-white shadow-sm border-l-4 ${TEMP_BORDA[r.temperatura]}`}>
@@ -1151,17 +1236,13 @@ function PropostaCard({
               <><span>·</span><span className="font-semibold text-gray-600">
                 {r.valor_implantacao > 0 && r.valor_mensal > 0
                   ? `${formatMoeda(r.valor_implantacao)} + ${formatMoeda(r.valor_mensal)}/mês`
-                  : r.valor_implantacao > 0
-                  ? formatMoeda(r.valor_implantacao)
-                  : `${formatMoeda(r.valor_mensal)}/mês`}
+                  : r.valor_implantacao > 0 ? formatMoeda(r.valor_implantacao) : `${formatMoeda(r.valor_mensal)}/mês`}
               </span></>
             )}
           </div>
           {r.servicos?.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
-              {r.servicos.map((s) => (
-                <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>
-              ))}
+              {r.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}
             </div>
           )}
           {r.observacoes && <p className="mt-2 text-xs text-gray-400 italic">{r.observacoes}</p>}
@@ -1170,6 +1251,11 @@ function PropostaCard({
               <span className="text-xs font-semibold text-gray-600">{sindico.nome}</span>
               <span className="text-xs text-gray-400">{sindico.tipo}</span>
               {sindico.telefone && <span className="text-xs text-gray-400">{sindico.telefone}</span>}
+            </div>
+          )}
+          {acaoInfo && (
+            <div className={`mt-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${acaoInfo.cls}`}>
+              {acaoInfo.texto}
             </div>
           )}
         </div>
@@ -1181,18 +1267,11 @@ function PropostaCard({
             </button>
           </div>
           {r.convertido_em_venda ? (
-            <button
-              onClick={onIrParaVendas}
-              className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
-            >
+            <button onClick={onIrParaVendas} className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">
               ✓ Convertido — Ver vendas
             </button>
           ) : (
-            <button
-              onClick={() => onConverter(r)}
-              disabled={convertendo === r.id}
-              className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50"
-            >
+            <button onClick={() => onConverter(r)} disabled={convertendo === r.id} className="rounded-lg border border-folk/30 px-3 py-1.5 text-xs font-semibold text-folk transition-colors hover:bg-folk/5 disabled:opacity-50">
               {convertendo === r.id ? "Abrindo..." : "→ Converter em venda"}
             </button>
           )}
@@ -1201,3 +1280,4 @@ function PropostaCard({
     </div>
   );
 }
+

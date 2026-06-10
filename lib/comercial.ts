@@ -15,11 +15,23 @@ export const TEMPERATURAS = [
 ] as const;
 
 export const STATUS_PIPELINE = [
-  { value: "apresentacao",  label: "Apresentação da empresa ou proposta" },
-  { value: "em_analise",    label: "Em análise" },
-  { value: "assinatura",    label: "Assinatura de Contrato" },
-  { value: "declinado",     label: "Declinado" },
-  { value: "fechado_ganho", label: "Fechado (ganho)" },
+  { value: "lead_cadastrado",      label: "Lead Cadastrado" },
+  { value: "apresentacao_empresa", label: "Apresentação da Empresa" },
+  { value: "proposta_analise",     label: "Proposta em Análise" },
+  { value: "assembleia_marcada",   label: "Assembleia Marcada" },
+  { value: "assinatura_contrato",  label: "Assinatura de Contrato" },
+  { value: "fechado",              label: "Fechado" },
+  { value: "declinado",            label: "Declinado" },
+] as const;
+
+export const PROXIMA_ACAO_TIPOS = [
+  "Ligação",
+  "WhatsApp",
+  "Reunião",
+  "Assembleia",
+  "Visita",
+  "Follow-up",
+  "Outro",
 ] as const;
 
 export const SERVICOS_COMERCIAL = [
@@ -32,9 +44,10 @@ export const SERVICOS_COMERCIAL = [
   "Aditivo de contrato",
 ] as const;
 
-export type TipoVenda      = (typeof TIPOS_VENDA)[number]["value"];
-export type Temperatura    = (typeof TEMPERATURAS)[number]["value"];
-export type StatusPipeline = (typeof STATUS_PIPELINE)[number]["value"];
+export type TipoVenda         = (typeof TIPOS_VENDA)[number]["value"];
+export type Temperatura       = (typeof TEMPERATURAS)[number]["value"];
+export type StatusPipeline    = (typeof STATUS_PIPELINE)[number]["value"];
+export type ProximaAcaoTipo   = (typeof PROXIMA_ACAO_TIPOS)[number];
 
 export interface Venda {
   id: string;
@@ -77,6 +90,13 @@ export interface PipelineItem {
   sindico_gestor_id: string | null;
   winner_competitor_id: string | null;
   loss_reason: string;
+  proxima_acao_datahora: string | null;
+  proxima_acao_tipo: string | null;
+  proxima_acao_descricao: string;
+  data_assembleia: string | null;
+  ultima_interacao: string | null;
+  google_event_id: string | null;
+  google_sync_status: string;
   created_at: string;
 }
 
@@ -232,7 +252,7 @@ export async function marcarPipelineConvertido(pipelineId: string, vendaId: stri
 
   const { error } = await supabase
     .from("pipeline")
-    .update({ convertido_em_venda: true, venda_id: vendaId, status: "fechado_ganho" })
+    .update({ convertido_em_venda: true, venda_id: vendaId, status: "fechado", ultima_interacao: new Date().toISOString() })
     .eq("id", pipelineId);
   if (error) throw new Error(error.message);
 
@@ -241,7 +261,7 @@ export async function marcarPipelineConvertido(pipelineId: string, vendaId: stri
       proposta_id:    pipelineId,
       campo:          "status",
       valor_anterior: statusAnteriorLabel,
-      valor_novo:     "Fechado (ganho)",
+      valor_novo:     "Fechado",
       autor_nome:     autorNome,
     },
     {
@@ -336,6 +356,9 @@ export interface FiltrosPipeline {
   temperatura?: Temperatura | "";
   status?: StatusPipeline | "";
   vendedorId?: string;
+  acoesAtrasadas?: boolean;
+  acoesHoje?: boolean;
+  acoesSemana?: boolean;
 }
 
 type RawPipelineItem = Omit<PipelineItem, "vendedor_nome"> & {
@@ -353,12 +376,24 @@ export async function listarPipeline(filtros?: FiltrosPipeline): Promise<Pipelin
   if (error) throw new Error(error.message);
   return (data as RawPipelineItem[] ?? []).map(({ vendedores, ...p }) => ({
     ...p,
+    proxima_acao_datahora:  p.proxima_acao_datahora ?? null,
+    proxima_acao_tipo:      p.proxima_acao_tipo ?? null,
+    proxima_acao_descricao: p.proxima_acao_descricao ?? "",
+    data_assembleia:        p.data_assembleia ?? null,
+    ultima_interacao:       p.ultima_interacao ?? null,
+    google_event_id:        p.google_event_id ?? null,
+    google_sync_status:     p.google_sync_status ?? "nao_sincronizado",
     vendedor_nome: vendedores?.nome ?? null,
   }));
 }
 
 export async function criarPipelineItem(payload: PipelinePayload): Promise<string> {
-  const { data, error } = await supabase.from("pipeline").insert(payload).select("id").single();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("pipeline")
+    .insert({ ...payload, ultima_interacao: now })
+    .select("id")
+    .single();
   if (error || !data) throw new Error(error?.message ?? "Erro ao criar proposta.");
   return (data as { id: string }).id;
 }
@@ -369,11 +404,38 @@ export async function editarPipelineItem(
   dadosAntigos: PipelineItem,
   vendedores: Vendedor[],
 ): Promise<void> {
-  const { error } = await supabase.from("pipeline").update(payload).eq("id", id);
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("pipeline").update({ ...payload, ultima_interacao: now }).eq("id", id);
   if (error) throw new Error(error.message);
 
-  // Log assíncrono — erro de log não bloqueia o save
   registrarAlteracoes(id, dadosAntigos, payload, vendedores).catch(() => {});
+}
+
+export async function atualizarStatusPipeline(
+  id: string,
+  novoStatus: StatusPipeline,
+  statusAnterior: StatusPipeline,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("pipeline").update({ status: novoStatus, ultima_interacao: now }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  const autorNome = await getAutorNome();
+  await supabase.from("pipeline_logs").insert({
+    proposta_id:    id,
+    campo:          "status",
+    valor_anterior: labelStatusPipeline(statusAnterior),
+    valor_novo:     labelStatusPipeline(novoStatus),
+    autor_nome:     autorNome,
+  });
+}
+
+export async function registrarIntencaoAgenda(propostaId: string, vendedorId: string | null): Promise<void> {
+  await supabase.from("crm_agenda_sync").insert({
+    proposta_id: propostaId,
+    vendedor_id: vendedorId ?? null,
+    status:      "pendente",
+  });
 }
 
 export async function excluirPipelineItem(id: string): Promise<void> {
@@ -527,13 +589,11 @@ async function registrarAlteracoes(
     return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
   };
 
-  if (antigo.status !== novo.status) {
+  if (antigo.status !== novo.status)
     logs.push({ proposta_id: propostaId, campo: "status", valor_anterior: labelStatusPipeline(antigo.status), valor_novo: labelStatusPipeline(novo.status), autor_nome: autorNome });
-  }
 
-  if (antigo.temperatura !== novo.temperatura) {
+  if (antigo.temperatura !== novo.temperatura)
     logs.push({ proposta_id: propostaId, campo: "temperatura", valor_anterior: labelTemperatura(antigo.temperatura), valor_novo: labelTemperatura(novo.temperatura), autor_nome: autorNome });
-  }
 
   if (antigo.vendedor_id !== novo.vendedor_id) {
     const nomeAntigo = antigo.vendedor_nome ?? "—";
@@ -541,21 +601,18 @@ async function registrarAlteracoes(
     logs.push({ proposta_id: propostaId, campo: "vendedor", valor_anterior: nomeAntigo, valor_novo: nomeNovo, autor_nome: autorNome });
   }
 
-  if (antigo.valor_implantacao !== novo.valor_implantacao) {
+  if (antigo.valor_implantacao !== novo.valor_implantacao)
     logs.push({ proposta_id: propostaId, campo: "valor_implantacao", valor_anterior: formatMoeda(antigo.valor_implantacao), valor_novo: formatMoeda(novo.valor_implantacao), autor_nome: autorNome });
-  }
-  if (antigo.valor_mensal !== novo.valor_mensal) {
+
+  if (antigo.valor_mensal !== novo.valor_mensal)
     logs.push({ proposta_id: propostaId, campo: "valor_mensal", valor_anterior: formatMoeda(antigo.valor_mensal), valor_novo: formatMoeda(novo.valor_mensal), autor_nome: autorNome });
-  }
 
   const antigosServicos = antigo.servicos ?? [];
   const novosServicos   = novo.servicos   ?? [];
-  for (const s of novosServicos.filter((s) => !antigosServicos.includes(s))) {
+  for (const s of novosServicos.filter((s) => !antigosServicos.includes(s)))
     logs.push({ proposta_id: propostaId, campo: "servico_adicionado", valor_anterior: "", valor_novo: s, autor_nome: autorNome });
-  }
-  for (const s of antigosServicos.filter((s) => !novosServicos.includes(s))) {
+  for (const s of antigosServicos.filter((s) => !novosServicos.includes(s)))
     logs.push({ proposta_id: propostaId, campo: "servico_removido", valor_anterior: s, valor_novo: "", autor_nome: autorNome });
-  }
 
   if (antigo.data_inicio_lead !== novo.data_inicio_lead)
     logs.push({ proposta_id: propostaId, campo: "data_lead", valor_anterior: formatData(antigo.data_inicio_lead), valor_novo: formatData(novo.data_inicio_lead), autor_nome: autorNome });
@@ -586,17 +643,25 @@ async function registrarAlteracoes(
   if ((antigo.observacoes ?? "") !== (novo.observacoes ?? ""))
     logs.push({ proposta_id: propostaId, campo: "observacoes", valor_anterior: antigo.observacoes || "—", valor_novo: novo.observacoes || "—", autor_nome: autorNome });
 
-  if (antigo.convertido_em_venda && logs.length > 0) {
-    logs.push({
-      proposta_id:    propostaId,
-      campo:          "edicao_pos_conversao",
-      valor_anterior: "original",
-      valor_novo:     "alterado",
-      autor_nome:     autorNome,
-    });
+  if ((antigo.proxima_acao_tipo ?? "") !== (novo.proxima_acao_tipo ?? ""))
+    logs.push({ proposta_id: propostaId, campo: "proxima_acao_tipo", valor_anterior: antigo.proxima_acao_tipo || "—", valor_novo: novo.proxima_acao_tipo || "—", autor_nome: autorNome });
+
+  if ((antigo.proxima_acao_datahora ?? "") !== (novo.proxima_acao_datahora ?? "")) {
+    const fmt = (v: string | null) => v ? new Date(v).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+    logs.push({ proposta_id: propostaId, campo: "proxima_acao_datahora", valor_anterior: fmt(antigo.proxima_acao_datahora), valor_novo: fmt(novo.proxima_acao_datahora), autor_nome: autorNome });
   }
 
-  if (logs.length === 0) return;
+  if ((antigo.proxima_acao_descricao ?? "") !== (novo.proxima_acao_descricao ?? ""))
+    logs.push({ proposta_id: propostaId, campo: "proxima_acao_descricao", valor_anterior: antigo.proxima_acao_descricao || "—", valor_novo: novo.proxima_acao_descricao || "—", autor_nome: autorNome });
 
+  if ((antigo.data_assembleia ?? "") !== (novo.data_assembleia ?? "")) {
+    const fmtDt = (v: string | null) => v ? new Date(v).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+    logs.push({ proposta_id: propostaId, campo: "data_assembleia", valor_anterior: fmtDt(antigo.data_assembleia), valor_novo: fmtDt(novo.data_assembleia), autor_nome: autorNome });
+  }
+
+  if (antigo.convertido_em_venda && logs.length > 0)
+    logs.push({ proposta_id: propostaId, campo: "edicao_pos_conversao", valor_anterior: "original", valor_novo: "alterado", autor_nome: autorNome });
+
+  if (logs.length === 0) return;
   await supabase.from("pipeline_logs").insert(logs);
 }

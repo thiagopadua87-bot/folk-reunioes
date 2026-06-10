@@ -3,18 +3,20 @@
 import { useState } from "react";
 import VendasTab from "./VendasTab";
 import PipelineTab from "./PipelineTab";
+import DashboardCRMTab from "./DashboardCRMTab";
 import type { PreenchimentoVenda, PipelineItem } from "@/lib/comercial";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
-type Aba = "vendas" | "pipeline";
+type Aba = "pipeline" | "vendas" | "dashboard";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "vendas",   label: "Vendas",   descricao: "Contratos fechados e receita realizada" },
-  { value: "pipeline", label: "Pipeline", descricao: "Propostas em andamento e potencial de receita" },
+  { value: "pipeline",  label: "Pipeline",  descricao: "Propostas em andamento e potencial de receita" },
+  { value: "vendas",    label: "Vendas",    descricao: "Contratos fechados e receita realizada" },
+  { value: "dashboard", label: "Dashboard", descricao: "Visão gerencial do funil e atividades comerciais" },
 ];
 
 export default function ComercialPage() {
-  const [aba, setAba] = useState<Aba>("vendas");
+  const [aba, setAba] = useState<Aba>("pipeline");
   const [preenchimento, setPreenchimento] = useState<PreenchimentoVenda | null>(null);
   const abaAtual = ABAS.find((a) => a.value === aba)!;
   const { guardCancel } = useUnsavedChanges();
@@ -35,14 +37,16 @@ export default function ComercialPage() {
     setAba("vendas");
   }
 
+  const isWide = aba === "pipeline";
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-8">
+    <main className={`mx-auto px-4 py-8 ${isWide ? "max-w-full" : "max-w-5xl"}`}>
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Comercial</h1>
         <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
       </div>
 
-      <div className="mb-8 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
+      <div className="mb-7 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
@@ -56,18 +60,19 @@ export default function ComercialPage() {
         ))}
       </div>
 
-      {aba === "vendas" && (
-        <VendasTab
-          preenchimento={preenchimento}
-          onPreenchimentoUsado={() => setPreenchimento(null)}
-        />
-      )}
       {aba === "pipeline" && (
         <PipelineTab
           onConverter={handleConverter}
           onIrParaVendas={() => setAba("vendas")}
         />
       )}
+      {aba === "vendas" && (
+        <VendasTab
+          preenchimento={preenchimento}
+          onPreenchimentoUsado={() => setPreenchimento(null)}
+        />
+      )}
+      {aba === "dashboard" && <DashboardCRMTab />}
     </main>
   );
 }

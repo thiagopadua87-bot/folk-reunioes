@@ -194,9 +194,9 @@ export default function ComercialTVPage() {
   const totalEquipServicos    = vendas.reduce((s, v) => s + v.valor_implantacao, 0);
   const qtdEquipServicos      = vendas.filter((v) => v.valor_implantacao > 0).length;
 
-  const pipelineAtivos      = pipeline.filter((p) => !["declinado", "fechado_ganho"].includes(p.status));
-  const pipelineNegociacao  = pipeline.filter((p) => ["em_analise", "assinatura"].includes(p.status));
-  const pipelineConvertidos = pipeline.filter((p) => p.status === "fechado_ganho").length;
+  const pipelineAtivos      = pipeline.filter((p) => !["declinado", "fechado"].includes(p.status));
+  const pipelineNegociacao  = pipeline.filter((p) => ["proposta_analise", "assinatura_contrato"].includes(p.status));
+  const pipelineConvertidos = pipeline.filter((p) => p.status === "fechado").length;
 
   const mesLabel  = `Meta ${relogio.getFullYear()}`;
   const horaLabel = relogio.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
