@@ -783,8 +783,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               </>
             )}
 
-            {/* Campo data_assembleia — visível apenas no status Assembleia Marcada */}
-            {form.status === "assembleia_marcada" && (
+            {/* Campo data_assembleia — visível quando status = assembleia_marcada E não sincronizado via próxima ação */}
+            {form.status === "assembleia_marcada" && form.proxima_acao_tipo !== "Assembleia" && (
               <div className="flex flex-col gap-1.5 sm:col-span-2 rounded-xl border border-purple-200 bg-purple-50 p-4">
                 <label className="text-xs font-bold uppercase tracking-wide text-purple-700">📅 Data da Assembleia</label>
                 <input
@@ -804,14 +804,47 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <label className={LABEL}>Próxima ação</label>
-                    <select value={form.proxima_acao_tipo} onChange={(e) => set("proxima_acao_tipo", e.target.value)} className={INPUT}>
+                    <select
+                      value={form.proxima_acao_tipo}
+                      onChange={(e) => {
+                        const tipo = e.target.value;
+                        setForm((p) => {
+                          const next = { ...p, proxima_acao_tipo: tipo };
+                          if (tipo === "Assembleia") {
+                            next.status = "assembleia_marcada";
+                            if (p.proxima_acao_datahora) next.data_assembleia = p.proxima_acao_datahora;
+                          }
+                          return next;
+                        });
+                        markDirty();
+                      }}
+                      className={INPUT}
+                    >
                       <option value="">Selecione...</option>
                       {PROXIMA_ACAO_TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className={LABEL}>Data / Hora</label>
-                    <input type="datetime-local" value={form.proxima_acao_datahora} onChange={(e) => set("proxima_acao_datahora", e.target.value)} className={INPUT} />
+                    <label className={LABEL}>
+                      Data / Hora
+                      {form.proxima_acao_tipo === "Assembleia" && (
+                        <span className="ml-1.5 text-purple-600 normal-case font-normal">(sincroniza data da assembleia)</span>
+                      )}
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={form.proxima_acao_datahora}
+                      onChange={(e) => {
+                        const dt = e.target.value;
+                        setForm((p) => {
+                          const next = { ...p, proxima_acao_datahora: dt };
+                          if (p.proxima_acao_tipo === "Assembleia") next.data_assembleia = dt;
+                          return next;
+                        });
+                        markDirty();
+                      }}
+                      className={INPUT}
+                    />
                   </div>
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
                     <label className={LABEL}>Observações da ação</label>
