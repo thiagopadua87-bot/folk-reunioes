@@ -439,8 +439,71 @@ export async function registrarIntencaoAgenda(propostaId: string, vendedorId: st
 }
 
 export async function excluirPipelineItem(id: string): Promise<void> {
+  const { data: item } = await supabase.from("pipeline").select("*").eq("id", id).single();
+  const autorNome = await getAutorNome();
+
+  if (item) {
+    await supabase.from("pipeline_lixeira").insert({
+      pipeline_id:            item.id,
+      user_id:                item.user_id,
+      cliente:                item.cliente,
+      cnpj:                   item.cnpj,
+      status:                 item.status,
+      temperatura:            item.temperatura,
+      vendedor_id:            item.vendedor_id,
+      vendedor_nome:          item.vendedor_nome,
+      indicado_por:           item.indicado_por,
+      observacoes:            item.observacoes,
+      servicos:               item.servicos,
+      valor_implantacao:      item.valor_implantacao,
+      valor_mensal:           item.valor_mensal,
+      data_inicio_lead:       item.data_inicio_lead,
+      sindico_gestor_id:      item.sindico_gestor_id,
+      winner_competitor_id:   item.winner_competitor_id,
+      loss_reason:            item.loss_reason,
+      proxima_acao_datahora:  item.proxima_acao_datahora,
+      proxima_acao_tipo:      item.proxima_acao_tipo,
+      proxima_acao_descricao: item.proxima_acao_descricao,
+      data_assembleia:        item.data_assembleia,
+      ultima_interacao:       item.ultima_interacao,
+      convertido_em_venda:    item.convertido_em_venda,
+      venda_id:               item.venda_id,
+      excluido_por_nome:      autorNome,
+      pipeline_created_at:    item.created_at,
+    });
+  }
+
   const { error } = await supabase.from("pipeline").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// ── Pipeline Lixeira ─────────────────────────────────────────
+
+export interface PipelineLixeiraItem {
+  id: string;
+  pipeline_id: string;
+  cliente: string;
+  cnpj: string | null;
+  status: string;
+  temperatura: string;
+  vendedor_nome: string | null;
+  indicado_por: string;
+  valor_implantacao: number;
+  valor_mensal: number;
+  data_inicio_lead: string | null;
+  servicos: string[] | null;
+  excluido_em: string;
+  excluido_por_nome: string | null;
+  pipeline_created_at: string | null;
+}
+
+export async function listarPipelineLixeira(): Promise<PipelineLixeiraItem[]> {
+  const { data, error } = await supabase
+    .from("pipeline_lixeira")
+    .select("id, pipeline_id, cliente, cnpj, status, temperatura, vendedor_nome, indicado_por, valor_implantacao, valor_mensal, data_inicio_lead, servicos, excluido_em, excluido_por_nome, pipeline_created_at")
+    .order("excluido_em", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PipelineLixeiraItem[];
 }
 
 // ── Opportunity Competitors ───────────────────────────────────

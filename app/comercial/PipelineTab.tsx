@@ -331,6 +331,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
   const [salvando, setSalvando]     = useState(false);
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
+  const [confirmExclusao, setConfirmExclusao] = useState<PipelineItem | null>(null);
   const [convertendo, setConvertendo] = useState<string | null>(null);
   const [filtros, setFiltros]       = useState<FiltrosPipeline>({ temperatura: "", status: "", vendedorId: "" });
   const [filtroAcao, setFiltroAcao] = useState<"" | "atrasadas" | "hoje" | "semana" | "sem_acao">("");
@@ -543,7 +544,15 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     } finally { setSalvando(false); }
   }
 
-  async function handleExcluir(id: string) {
+  function handleSolicitarExclusao(id: string) {
+    const item = registros.find((r) => r.id === id) ?? null;
+    setConfirmExclusao(item);
+  }
+
+  async function handleConfirmarExclusao() {
+    if (!confirmExclusao) return;
+    const id = confirmExclusao.id;
+    setConfirmExclusao(null);
     setExcluindo(id);
     try { await excluirPipelineItem(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
@@ -1125,7 +1134,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           excluindo={excluindo}
           convertendo={convertendo}
           onEditar={abrirEditar}
-          onExcluir={handleExcluir}
+          onExcluir={handleSolicitarExclusao}
           onConverter={handleConverter}
           onIrParaVendas={onIrParaVendas}
           onMoverCard={handleMoverCard}
@@ -1140,7 +1149,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               key={r.id} r={r}
               allCompetitors={allCompetitors} allSindicosGestores={allSindicosGestores}
               excluindo={excluindo} convertendo={convertendo}
-              onEditar={abrirEditar} onExcluir={handleExcluir}
+              onEditar={abrirEditar} onExcluir={handleSolicitarExclusao}
               onConverter={handleConverter} onIrParaVendas={onIrParaVendas}
             />
           ))}
@@ -1158,12 +1167,57 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
                   key={r.id} r={r}
                   allCompetitors={allCompetitors} allSindicosGestores={allSindicosGestores}
                   excluindo={excluindo} convertendo={convertendo}
-                  onEditar={abrirEditar} onExcluir={handleExcluir}
+                  onEditar={abrirEditar} onExcluir={handleSolicitarExclusao}
                   onConverter={handleConverter} onIrParaVendas={onIrParaVendas}
                 />
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Modal de confirmação de exclusão ── */}
+      {confirmExclusao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-base font-bold text-gray-900">Excluir lead?</h3>
+            <p className="mb-4 text-sm text-gray-500">
+              Esta ação é irreversível. O registro será removido do pipeline.
+            </p>
+            <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm">
+              <p className="font-semibold text-gray-900">{confirmExclusao.cliente}</p>
+              {confirmExclusao.cnpj && (
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{confirmExclusao.cnpj}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Status: <span className="font-medium">{labelStatusPipeline(confirmExclusao.status)}</span>
+                {confirmExclusao.vendedor_nome && (
+                  <> · Vendedor: <span className="font-medium">{confirmExclusao.vendedor_nome}</span></>
+                )}
+              </p>
+              {(confirmExclusao.valor_mensal > 0 || confirmExclusao.valor_implantacao > 0) && (
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {confirmExclusao.valor_mensal > 0 && <>{formatMoeda(confirmExclusao.valor_mensal)}/mês</>}
+                  {confirmExclusao.valor_mensal > 0 && confirmExclusao.valor_implantacao > 0 && " + "}
+                  {confirmExclusao.valor_implantacao > 0 && <>{formatMoeda(confirmExclusao.valor_implantacao)} implantação</>}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmExclusao(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarExclusao}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

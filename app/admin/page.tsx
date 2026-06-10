@@ -4,6 +4,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-admin";
 import type { Profile } from "@/lib/profiles";
 import AdminPanel from "./AdminPanel";
+import PipelineLixeiraAdmin from "./PipelineLixeiraAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,10 @@ export default async function AdminPage() {
       </div>
 
       <AdminPanel profiles={(profiles ?? []) as Profile[]} />
+
+      <div className="mt-10 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <PipelineLixeiraAdmin />
+      </div>
     </main>
   );
 }

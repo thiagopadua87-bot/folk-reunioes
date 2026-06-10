@@ -48,7 +48,7 @@ function KPI({ label, value, sub, alerta, cor = "gray" }: {
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${colors.card}`}>
       <p className={`text-[10px] font-bold uppercase tracking-wide ${colors.lbl} mb-1`}>{label}</p>
-      <p className={`text-3xl font-black ${colors.txt}`}>{alerta && typeof value === "number" && value > 0 ? "⚠ " : ""}{value}</p>
+      <p className={`${typeof value === "string" ? "text-lg font-bold leading-tight" : "text-3xl font-black"} ${colors.txt}`}>{alerta && typeof value === "number" && value > 0 ? "⚠ " : ""}{value}</p>
       {sub && <p className={`text-xs mt-0.5 ${colors.lbl}`}>{sub}</p>}
     </div>
   );
@@ -144,10 +144,9 @@ export default function DashboardCRMTab() {
     "assembleia_marcada", "assinatura_contrato", "fechado", "declinado",
   ];
 
-  const funil = useMemo(() => statusOrdem.map((status, i) => {
+  const funil = useMemo(() => statusOrdem.map((status) => {
     const count = filtrados.filter(r => r.status === status).length;
-    const anterior = i > 0 ? filtrados.filter(r => r.status === statusOrdem[i - 1]).length : null;
-    const pctConversao = anterior !== null && anterior > 0 ? Math.round((count / anterior) * 100) : null;
+    const pctConversao = filtrados.length > 0 ? Math.round((count / filtrados.length) * 100) : 0;
     return { status, label: labelStatusPipeline(status), count, cor: STATUS_COR[status], pctConversao };
   }), [filtrados]);
 
@@ -279,11 +278,11 @@ export default function DashboardCRMTab() {
                 count={count}
                 max={maxFunil}
                 cor={cor}
-                pct={pctConversao !== null ? `${pctConversao}%` : ""}
+                pct={filtrados.length > 0 ? `${pctConversao}%` : ""}
               />
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-gray-400">% = conversão em relação à etapa anterior</p>
+          <p className="mt-3 text-[11px] text-gray-400">% = participação sobre o total de oportunidades no período</p>
         </Card>
 
         {/* Novos leads por mês */}
