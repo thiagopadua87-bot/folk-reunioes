@@ -44,10 +44,57 @@ export const SERVICOS_COMERCIAL = [
   "Aditivo de contrato",
 ] as const;
 
-export type TipoVenda         = (typeof TIPOS_VENDA)[number]["value"];
-export type Temperatura       = (typeof TEMPERATURAS)[number]["value"];
-export type StatusPipeline    = (typeof STATUS_PIPELINE)[number]["value"];
-export type ProximaAcaoTipo   = (typeof PROXIMA_ACAO_TIPOS)[number];
+export const MOTIVOS_PERDA_PIPELINE = [
+  "Preço",
+  "Concorrência",
+  "Sem Interesse",
+  "Sem Retorno",
+  "Assembleia Rejeitada",
+  "Momento Inadequado",
+  "Mudança de Prioridade",
+  "Outro",
+] as const;
+
+export type TipoVenda              = (typeof TIPOS_VENDA)[number]["value"];
+export type Temperatura            = (typeof TEMPERATURAS)[number]["value"];
+export type StatusPipeline         = (typeof STATUS_PIPELINE)[number]["value"];
+export type ProximaAcaoTipo        = (typeof PROXIMA_ACAO_TIPOS)[number];
+export type MotivoPerdaPipeline    = (typeof MOTIVOS_PERDA_PIPELINE)[number];
+
+// ── Meta Comercial ───────────────────────────────────────────
+
+export interface MetaComercial {
+  id: string;
+  ano: number;
+  mes: number;
+  meta_contratos: number;
+  meta_mrr: number;
+  meta_implantacao: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listarMetas(): Promise<MetaComercial[]> {
+  const { data, error } = await supabase
+    .from("metas_comerciais")
+    .select("*")
+    .order("ano", { ascending: false })
+    .order("mes", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as MetaComercial[];
+}
+
+export async function salvarMeta(
+  payload: Pick<MetaComercial, "ano" | "mes" | "meta_contratos" | "meta_mrr" | "meta_implantacao">
+): Promise<MetaComercial> {
+  const { data, error } = await supabase
+    .from("metas_comerciais")
+    .upsert({ ...payload, updated_at: new Date().toISOString() }, { onConflict: "ano,mes" })
+    .select()
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao salvar meta.");
+  return data as MetaComercial;
+}
 
 export interface Venda {
   id: string;
@@ -90,6 +137,7 @@ export interface PipelineItem {
   sindico_gestor_id: string | null;
   winner_competitor_id: string | null;
   loss_reason: string;
+  motivo_perda_categoria: MotivoPerdaPipeline | null;
   proxima_acao_datahora: string | null;
   proxima_acao_tipo: string | null;
   proxima_acao_descricao: string;
@@ -376,13 +424,14 @@ export async function listarPipeline(filtros?: FiltrosPipeline): Promise<Pipelin
   if (error) throw new Error(error.message);
   return (data as RawPipelineItem[] ?? []).map(({ vendedores, ...p }) => ({
     ...p,
-    proxima_acao_datahora:  p.proxima_acao_datahora ?? null,
-    proxima_acao_tipo:      p.proxima_acao_tipo ?? null,
-    proxima_acao_descricao: p.proxima_acao_descricao ?? "",
-    data_assembleia:        p.data_assembleia ?? null,
-    ultima_interacao:       p.ultima_interacao ?? null,
-    google_event_id:        p.google_event_id ?? null,
-    google_sync_status:     p.google_sync_status ?? "nao_sincronizado",
+    proxima_acao_datahora:   p.proxima_acao_datahora ?? null,
+    proxima_acao_tipo:       p.proxima_acao_tipo ?? null,
+    proxima_acao_descricao:  p.proxima_acao_descricao ?? "",
+    data_assembleia:         p.data_assembleia ?? null,
+    ultima_interacao:        p.ultima_interacao ?? null,
+    google_event_id:         p.google_event_id ?? null,
+    google_sync_status:      p.google_sync_status ?? "nao_sincronizado",
+    motivo_perda_categoria:  (p as Record<string, unknown>).motivo_perda_categoria as MotivoPerdaPipeline | null ?? null,
     vendedor_nome: vendedores?.nome ?? null,
   }));
 }

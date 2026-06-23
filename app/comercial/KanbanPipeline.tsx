@@ -72,6 +72,23 @@ function calcInteracaoStatus(dt: string | null): { dias: number; cls: string; te
   return           { dias, cls: "text-red-600",   texto: `⚠ ${dias}d atrás` };
 }
 
+function calcProbScore(item: PipelineItem): number {
+  const stageBase: Record<string, number> = {
+    lead_cadastrado: 10, apresentacao_empresa: 25, proposta_analise: 45,
+    assembleia_marcada: 65, assinatura_contrato: 85, fechado: 100, declinado: 0,
+  };
+  const base   = stageBase[item.status] ?? 10;
+  const tempMod = item.temperatura === "quente" ? 15 : item.temperatura === "fria" ? -10 : 0;
+  const assembleiaMod = item.data_assembleia ? 8 : 0;
+  const hasAction = item.proxima_acao_datahora ? 5 : 0;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const actionOverdue = item.proxima_acao_datahora && new Date(item.proxima_acao_datahora) < hoje ? -12 : 0;
+  const ref = item.ultima_interacao ?? item.created_at;
+  const diasSem = ref ? Math.floor((Date.now() - new Date(ref).getTime()) / 86400000) : 30;
+  const inact = diasSem > 30 ? -25 : diasSem > 15 ? -15 : diasSem > 7 ? -8 : 0;
+  return Math.min(99, Math.max(1, Math.round(base + tempMod + assembleiaMod + hasAction + actionOverdue + inact)));
+}
+
 // ── Props ────────────────────────────────────────────────────
 
 interface KanbanPipelineProps {
@@ -283,12 +300,25 @@ function KanbanCard({
       } ${isMovendo ? "opacity-60 pointer-events-none" : ""}`}
     >
       <div className="px-3 pt-2.5 pb-2">
-        {/* Cliente + temperatura */}
+        {/* Cliente + temperatura + probabilidade */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <p className="text-xs font-bold text-gray-900 leading-tight line-clamp-2 flex-1">{item.cliente}</p>
-          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TEMP_BADGE[item.temperatura]}`}>
-            {labelTemperatura(item.temperatura)}
-          </span>
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TEMP_BADGE[item.temperatura]}`}>
+              {labelTemperatura(item.temperatura)}
+            </span>
+            {!["fechado","declinado"].includes(item.status) && (() => {
+              const score = calcProbScore(item);
+              const cls = score >= 70 ? "bg-emerald-100 text-emerald-700"
+                        : score >= 40 ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-600";
+              return (
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${cls}`} title="Probabilidade de fechamento">
+                  {score}%
+                </span>
+              );
+            })()}
+          </div>
         </div>
 
         {/* CNPJ */}
