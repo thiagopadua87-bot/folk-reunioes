@@ -71,14 +71,16 @@ const COR_MAP: Record<Cor, { card: string; txt: string; lbl: string }> = {
 };
 
 function DeltaLine({ diff, p, label, moeda }: { diff: number; p: number|null; label: string; moeda?: boolean }) {
-  if (diff === 0 && p === null) return <p className="text-[10px] text-gray-300">—</p>;
+  if (diff === 0 && p === null) return <p className="text-[10px] text-gray-300 leading-snug">—</p>;
   const up = diff > 0;
   const cls = up ? "text-emerald-600" : "text-red-500";
   const icon = up ? "↑" : "↓";
   const val = moeda ? formatMoeda(Math.abs(diff)) : String(Math.abs(diff));
+  const pctStr = p !== null ? ` (${Math.abs(p)}%)` : "";
   return (
-    <p className={`text-[10px] font-semibold leading-relaxed ${cls}`}>
-      {icon} {up && !moeda ? "+" : ""}{val}{p !== null ? ` (${Math.abs(p)}%)` : ""} {label}
+    <p className={`text-[10px] font-semibold break-words whitespace-normal [line-height:1.4] ${cls}`}>
+      {icon} {up && !moeda ? "+" : ""}{val}{pctStr}{" "}
+      <span className="font-normal text-gray-400">{label}</span>
     </p>
   );
 }
@@ -90,13 +92,15 @@ function KPI({ label, value, sub, alerta, cor="gray", deltaSemana, deltaMes }: {
 }) {
   const { card, txt, lbl } = COR_MAP[cor];
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm flex flex-col ${card}`}>
-      <p className={`text-[10px] font-bold uppercase tracking-wide ${lbl} mb-1`}>{label}</p>
-      <p className={`${typeof value === "string" ? "text-lg font-bold leading-tight" : "text-2xl font-black"} ${txt} mb-1`}>
-        {alerta && typeof value === "number" && value > 0 ? "⚠ " : ""}{value}
-      </p>
-      {sub && <p className={`text-[10px] ${lbl} mb-1`}>{sub}</p>}
-      <div className="mt-auto pt-1.5 flex flex-col gap-0.5 border-t border-black/5">
+    <div className={`rounded-2xl border p-4 shadow-sm flex flex-col min-h-[180px] justify-between ${card}`}>
+      <div>
+        <p className={`text-[10px] font-bold uppercase tracking-wide ${lbl} mb-1`}>{label}</p>
+        <p className={`${typeof value === "string" ? "text-sm font-bold leading-tight break-words" : "text-2xl font-black"} ${txt} mb-1`}>
+          {alerta && typeof value === "number" && value > 0 ? "⚠ " : ""}{value}
+        </p>
+        {sub && <p className={`text-[10px] ${lbl} leading-snug`}>{sub}</p>}
+      </div>
+      <div className="pt-2 flex flex-col gap-1 border-t border-black/5 mt-3">
         {deltaSemana != null && <DeltaLine {...deltaSemana} label="vs semana ant." />}
         {deltaMes    != null && <DeltaLine {...deltaMes}    label="vs mês ant." />}
         {deltaSemana == null && deltaMes == null && <p className="text-[10px] text-gray-300">—</p>}
