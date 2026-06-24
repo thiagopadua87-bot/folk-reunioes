@@ -11,9 +11,11 @@ import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const NAV_BASE = [
   { label: "Início",       href: "/" },
+  { label: "Reuniões",     href: "/reuniao" },
   { label: "Comercial",    href: "/comercial" },
   { label: "Projetos",     href: "/projetos" },
   { label: "Operacional",  href: "/operacional" },
+  { label: "Cobrança",     href: "/inadimplencia" },
   { label: "Cadastros",    href: "/cadastros" },
 ];
 
