@@ -163,8 +163,8 @@ export default function DashboardCRMTab() {
 
   // Modal de meta
   const [modalMeta, setModalMeta] = useState<{
-    aberto: boolean; meta_contratos: string; meta_mrr: string; meta_implantacao: string; salvando: boolean; erro: string|null;
-  }>({ aberto: false, meta_contratos: "", meta_mrr: "", meta_implantacao: "", salvando: false, erro: null });
+    aberto: boolean; tipo: "mensal" | "anual"; meta_contratos: string; meta_mrr: string; meta_implantacao: string; salvando: boolean; erro: string|null;
+  }>({ aberto: false, tipo: "mensal", meta_contratos: "", meta_mrr: "", meta_implantacao: "", salvando: false, erro: null });
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
@@ -226,6 +226,10 @@ export default function DashboardCRMTab() {
     return metas.find(m => m.ano === ano && m.mes === mes) ?? null;
   }, [metas, hoje]);
 
+  const metaAnual = useMemo(() => {
+    return metas.find(m => m.ano === hoje.getFullYear() && m.mes === 0) ?? null;
+  }, [metas, hoje]);
+
   const realizadoMes = useMemo(() => {
     const inicio = inicioMesAtual.toISOString().slice(0,10);
     const fechadosMes = base.filter(r => r.status === "fechado" && r.ultima_interacao && r.ultima_interacao.slice(0,10) >= inicio);
@@ -235,6 +239,16 @@ export default function DashboardCRMTab() {
       implantacao: fechadosMes.reduce((s,r) => s + r.valor_implantacao, 0),
     };
   }, [base, inicioMesAtual]);
+
+  const realizadoAnual = useMemo(() => {
+    const inicioAno = `${hoje.getFullYear()}-01-01`;
+    const fechadosAno = base.filter(r => r.status === "fechado" && r.ultima_interacao && r.ultima_interacao.slice(0,10) >= inicioAno);
+    return {
+      contratos:   fechadosAno.length,
+      mrr:         fechadosAno.reduce((s,r) => s + r.valor_mensal, 0),
+      implantacao: fechadosAno.reduce((s,r) => s + r.valor_implantacao, 0),
+    };
+  }, [base, hoje]);
 
   // ── KPIs ─────────────────────────────────────────────────
 
@@ -592,9 +606,10 @@ export default function DashboardCRMTab() {
     }
     setModalMeta(p=>({...p, salvando:true, erro:null}));
     try {
-      const saved = await salvarMeta({ ano: hoje.getFullYear(), mes: hoje.getMonth()+1, meta_contratos:mc, meta_mrr:mm, meta_implantacao:mi });
+      const mes = modalMeta.tipo === "anual" ? 0 : hoje.getMonth()+1;
+      const saved = await salvarMeta({ ano: hoje.getFullYear(), mes, meta_contratos:mc, meta_mrr:mm, meta_implantacao:mi });
       setMetas(prev => { const idx=prev.findIndex(m=>m.id===saved.id); return idx>=0 ? prev.map((m,i)=>i===idx?saved:m) : [...prev, saved]; });
-      setModalMeta({ aberto:false, meta_contratos:"", meta_mrr:"", meta_implantacao:"", salvando:false, erro:null });
+      setModalMeta({ aberto:false, tipo:"mensal", meta_contratos:"", meta_mrr:"", meta_implantacao:"", salvando:false, erro:null });
     } catch(e) {
       setModalMeta(p=>({...p, salvando:false, erro:e instanceof Error?e.message:"Erro ao salvar."}));
     }
@@ -660,10 +675,19 @@ export default function DashboardCRMTab() {
               <> · Filtro: <span className="font-semibold text-folk">{vendedores.find(v=>v.id===vendedorId)!.nome}</span></>
             )}
           </p>
-          <button type="button" onClick={()=>setModalMeta({ aberto:true, meta_contratos:String(metaMes?.meta_contratos||""), meta_mrr:String(metaMes?.meta_mrr||""), meta_implantacao:String(metaMes?.meta_implantacao||""), salvando:false, erro:null })}
-            className="text-xs font-semibold text-folk hover:underline">
-            {metaMes ? "Editar meta do mês" : "Definir meta do mês"}
-          </button>
+          <div className="flex items-center gap-4">
+            <button type="button"
+              onClick={()=>setModalMeta({ aberto:true, tipo:"mensal", meta_contratos:String(metaMes?.meta_contratos||""), meta_mrr:String(metaMes?.meta_mrr||""), meta_implantacao:String(metaMes?.meta_implantacao||""), salvando:false, erro:null })}
+              className="text-xs font-semibold text-folk hover:underline">
+              {metaMes ? "Editar meta do mês" : "Definir meta do mês"}
+            </button>
+            <span className="text-gray-200">|</span>
+            <button type="button"
+              onClick={()=>setModalMeta({ aberto:true, tipo:"anual", meta_contratos:String(metaAnual?.meta_contratos||""), meta_mrr:String(metaAnual?.meta_mrr||""), meta_implantacao:String(metaAnual?.meta_implantacao||""), salvando:false, erro:null })}
+              className="text-xs font-semibold text-folk hover:underline">
+              {metaAnual ? "Editar meta do ano" : "Definir meta do ano"}
+            </button>
+          </div>
         </div>
       </Card>
 
@@ -713,6 +737,62 @@ export default function DashboardCRMTab() {
                       </div>
                     </div>
                     <BarraProg pct={p} cor={superada ? "#059669" : cor} label={`${p}% da meta`} />
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400 mt-1">Meta não definida</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Meta Anual ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-gray-900">
+            Meta Anual — {anoAtual}
+          </h2>
+          {!metaAnual && (
+            <span className="text-[11px] text-gray-400 italic">Nenhuma meta definida para este ano.</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            {
+              label: "Contratos", meta: metaAnual?.meta_contratos??0, realizado: realizadoAnual.contratos,
+              fmt: (v: number) => String(v), cor: "#F05A28",
+            },
+            {
+              label: "MRR", meta: metaAnual?.meta_mrr??0, realizado: realizadoAnual.mrr,
+              fmt: formatMoeda, cor: "#059669",
+            },
+            {
+              label: "Implantação", meta: metaAnual?.meta_implantacao??0, realizado: realizadoAnual.implantacao,
+              fmt: formatMoeda, cor: "#60a5fa",
+            },
+          ].map(({ label, meta, realizado, fmt, cor }) => {
+            const p = pct(realizado, meta);
+            const superada = meta > 0 && realizado >= meta;
+            return (
+              <div key={label} className={`rounded-2xl border p-4 ${superada ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white"}`}>
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Meta anual de {label}</p>
+                  {superada && <span className="text-[10px] font-bold text-emerald-700">🏆 Superada!</span>}
+                </div>
+                {meta > 0 ? (
+                  <>
+                    <div className="flex items-end justify-between mb-1.5">
+                      <div>
+                        <p className="text-[10px] text-gray-400">Realizado {anoAtual}</p>
+                        <p className="text-lg font-black text-gray-900">{fmt(realizado)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400">Meta</p>
+                        <p className="text-sm font-semibold text-gray-600">{fmt(meta)}</p>
+                      </div>
+                    </div>
+                    <BarraProg pct={p} cor={superada ? "#059669" : cor} label={`${p}% da meta anual`} />
                   </>
                 ) : (
                   <p className="text-sm text-gray-400 mt-1">Meta não definida</p>
@@ -1187,8 +1267,12 @@ export default function DashboardCRMTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
             <div className="border-b border-gray-100 px-6 py-4">
-              <h3 className="text-base font-bold text-gray-900">Meta Comercial</h3>
-              <p className="mt-0.5 text-sm text-gray-500">{MESES_COMPLETOS[mesAtualNum]} {anoAtual}</p>
+              <h3 className="text-base font-bold text-gray-900">
+                {modalMeta.tipo === "anual" ? "Meta Anual" : "Meta Mensal"}
+              </h3>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {modalMeta.tipo === "anual" ? String(anoAtual) : `${MESES_COMPLETOS[mesAtualNum]} ${anoAtual}`}
+              </p>
             </div>
             <div className="grid grid-cols-1 gap-4 px-6 py-5">
               <div className="flex flex-col gap-1.5">
@@ -1213,7 +1297,7 @@ export default function DashboardCRMTab() {
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
               <button type="button"
-                onClick={()=>setModalMeta({ aberto:false, meta_contratos:"", meta_mrr:"", meta_implantacao:"", salvando:false, erro:null })}
+                onClick={()=>setModalMeta({ aberto:false, tipo:"mensal", meta_contratos:"", meta_mrr:"", meta_implantacao:"", salvando:false, erro:null })}
                 className="rounded-2xl border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300">
                 Cancelar
               </button>
