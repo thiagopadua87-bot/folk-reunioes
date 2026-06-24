@@ -453,6 +453,17 @@ export async function listarObraAcoes(obraId: string): Promise<ObraAcao[]> {
   return (data ?? []) as ObraAcao[];
 }
 
+export async function listarObraAcoesVencidas(): Promise<{ id: string; obra_id: string }[]> {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("obra_acoes")
+    .select("id, obra_id")
+    .lt("prazo", hoje)
+    .neq("status", "concluido");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as { id: string; obra_id: string }[];
+}
+
 export async function criarObraAcao(obraId: string, payload: Omit<ObraAcaoPayload, "obra_id">): Promise<void> {
   const { error } = await supabase.from("obra_acoes").insert({ ...payload, obra_id: obraId });
   if (error) throw new Error(error.message);
