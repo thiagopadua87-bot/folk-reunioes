@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import FaturasTab from "./FaturasTab";
+import ClientesCobrancaTab from "./ClientesCobrancaTab";
 import DashboardCobrancaTab from "./DashboardCobrancaTab";
 import ConfiguracoesCobrancaTab from "./ConfiguracoesCobrancaTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -9,9 +9,9 @@ import { useUnsavedChanges } from "@/lib/unsaved-changes";
 type Aba = "faturas" | "dashboard" | "configuracoes";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "faturas",        label: "Faturas",        descricao: "Faturas em aberto e histórico de ações de cobrança" },
-  { value: "dashboard",      label: "Dashboard",      descricao: "Visão gerencial da inadimplência e recuperação de crédito" },
-  { value: "configuracoes",  label: "Configurações",  descricao: "Tipos de ação e parâmetros do módulo de cobrança" },
+  { value: "faturas",       label: "Clientes",      descricao: "Visão de cobrança por cliente — histórico, ações e faturas em aberto" },
+  { value: "dashboard",     label: "Dashboard",     descricao: "Visão gerencial da inadimplência e recuperação de crédito" },
+  { value: "configuracoes", label: "Configurações", descricao: "Tipos de ação e parâmetros do módulo de cobrança" },
 ];
 
 export default function InadimplenciaPage() {
@@ -42,7 +42,7 @@ export default function InadimplenciaPage() {
         ))}
       </div>
 
-      {aba === "faturas"       && <FaturasTab />}
+      {aba === "faturas"       && <ClientesCobrancaTab />}
       {aba === "dashboard"     && <DashboardCobrancaTab />}
       {aba === "configuracoes" && <ConfiguracoesCobrancaTab />}
     </main>

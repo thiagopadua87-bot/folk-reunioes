@@ -342,6 +342,48 @@ export async function buscarUltimasAcoes(faturaIds: string[]): Promise<Map<strin
   return mapa;
 }
 
+// ── Status de Negociação (nível cliente) ─────────────────────────
+
+export const STATUS_NEGOCIACAO = [
+  { value: "juridico",   label: "Jurídico",              cor: "bg-red-100 text-red-700 border-red-200" },
+  { value: "promessa",   label: "Promessa de pagamento", cor: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "aguardando", label: "Aguardando retorno",    cor: "bg-orange-100 text-orange-700 border-orange-200" },
+  { value: "negociacao", label: "Em negociação",         cor: "bg-purple-100 text-purple-700 border-purple-200" },
+  { value: "sem_contato","label": "Sem contato",         cor: "bg-gray-100 text-gray-600 border-gray-200" },
+] as const;
+
+export type StatusNegociacao = (typeof STATUS_NEGOCIACAO)[number]["value"];
+
+export function deriveStatusNegociacao(
+  faturas: Fatura[],
+  ultimaAcao: UltimaAcaoFatura | null,
+): StatusNegociacao {
+  if (faturas.some((f) => ["juridico", "protestada"].includes(f.status))) return "juridico";
+  if (faturas.some((f) => f.status === "promessa_pagamento")) return "promessa";
+  if (ultimaAcao?.proxima_acao) return "aguardando";
+  if (faturas.some((f) => ["negociada", "em_cobranca"].includes(f.status))) return "negociacao";
+  if (ultimaAcao) return "negociacao";
+  return "sem_contato";
+}
+
+export async function listarAcoesCliente(faturaIds: string[]): Promise<InadimplenciaAcao[]> {
+  if (faturaIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("inadimplencia_acoes")
+    .select("*")
+    .in("fatura_id", faturaIds)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const acoes = (data ?? []) as InadimplenciaAcao[];
+  const uids = [...new Set(acoes.map((a) => a.usuario_id))];
+  const nomes: Record<string, string> = {};
+  if (uids.length > 0) {
+    const { data: perfis } = await supabase.from("profiles").select("id, nome").in("id", uids);
+    (perfis ?? []).forEach((p: { id: string; nome: string }) => { nomes[p.id] = p.nome; });
+  }
+  return acoes.map((a) => ({ ...a, usuario_nome: nomes[a.usuario_id] ?? "—" }));
+}
+
 // ── Dashboard KPIs ───────────────────────────────────────────────
 
 export interface MaiorDevedor {
