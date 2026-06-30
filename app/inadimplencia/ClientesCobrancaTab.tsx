@@ -124,14 +124,14 @@ function KPIIndicador({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-1 flex-col rounded-2xl border p-4 text-left shadow-sm transition-all min-w-[100px] ${
+      className={`flex flex-col rounded-2xl border p-3 text-left shadow-sm transition-all ${
         ativo
           ? "border-folk bg-folk/5 ring-2 ring-folk/20"
           : "border-gray-200 bg-white hover:border-folk/30 hover:shadow-md"
       }`}
     >
-      <p className={`text-2xl font-black leading-none ${cor ?? "text-gray-900"}`}>{value}</p>
-      <p className="mt-1 text-[11px] font-medium leading-tight text-gray-400">{label}</p>
+      <p className={`truncate text-lg font-black leading-none ${cor ?? "text-gray-900"}`}>{value}</p>
+      <p className="mt-1 text-[10px] font-medium leading-tight text-gray-400">{label}</p>
     </button>
   );
 }
@@ -445,20 +445,20 @@ function CardCliente({
                         </td>
                         <td className="py-2.5 px-2"><BadgeStatus status={f.status} /></td>
                         <td className="py-2.5 pr-3">
-                          <div className="flex flex-wrap gap-1">
+                          <select
+                            value=""
+                            onChange={async (e) => {
+                              if (!e.target.value) return;
+                              await atualizarStatusFatura(f.id, e.target.value as StatusFatura);
+                              await onRecarregar();
+                            }}
+                            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-600 focus:border-folk focus:outline-none focus:ring-1 focus:ring-folk/20"
+                          >
+                            <option value="">Alterar status...</option>
                             {STATUS_FATURA.filter((s) => s.value !== f.status).map((s) => (
-                              <button
-                                key={s.value}
-                                onClick={async () => {
-                                  await atualizarStatusFatura(f.id, s.value);
-                                  await onRecarregar();
-                                }}
-                                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.cor}`}
-                              >
-                                {s.label}
-                              </button>
+                              <option key={s.value} value={s.value}>{s.label}</option>
                             ))}
-                          </div>
+                          </select>
                         </td>
                       </tr>
                     );
@@ -757,7 +757,7 @@ export default function ClientesCobrancaTab() {
       ) : (
         <>
           {/* KPIs clicáveis */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
             <KPIIndicador
               label="Clientes inadimplentes"
               value={ind.total}
