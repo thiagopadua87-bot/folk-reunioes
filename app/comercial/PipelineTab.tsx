@@ -539,6 +539,10 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
       markClean();
       await carregar();
       if (editando) {
+        if (form.status === "fechado" && editando.status !== "fechado") {
+          handleConverter({ ...editando, ...payload } as PipelineItem);
+          return;
+        }
         setEditando((prev) => prev ? { ...prev, ...payload, vendedor_nome: vendedores.find(v => v.id === payload.vendedor_id)?.nome ?? null } : null);
         setTimeout(() => carregarLogs(savedId), 400);
         setErroForm(null);
@@ -574,6 +578,10 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
     setRegistros((prev) => prev.map((r) => r.id === itemId ? { ...r, status: novoStatus } : r));
     try {
       await atualizarStatusPipeline(itemId, novoStatus, statusAnterior);
+      if (novoStatus === "fechado") {
+        const item = registros.find((r) => r.id === itemId);
+        if (item) handleConverter(item);
+      }
     } catch {
       setRegistros((prev) => prev.map((r) => r.id === itemId ? { ...r, status: statusAnterior } : r));
       setErro("Erro ao mover card. Tente novamente.");
