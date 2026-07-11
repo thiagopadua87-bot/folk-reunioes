@@ -273,7 +273,7 @@ function NavLinks({ isAdmin, onClose }: { isAdmin: boolean; onClose?: () => void
 
 // ── Componente principal ──────────────────────────────────────
 
-const AUTH_PATHS = ["/login", "/signup", "/pendente", "/recusado", "/comercial/tv"];
+const AUTH_PATHS = ["/login", "/signup", "/pendente", "/recusado", "/inativo", "/comercial/tv"];
 
 export default function AppSidebar() {
   const pathname = usePathname();

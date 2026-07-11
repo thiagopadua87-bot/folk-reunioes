@@ -22,7 +22,12 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
 
     if (error || !data.user) {
-      setErro("Email ou senha incorretos.");
+      const msg = error?.message ?? "";
+      if (msg.toLowerCase().includes("ban") || msg.toLowerCase().includes("inativ")) {
+        setErro("Conta inativa. Entre em contato com o administrador.");
+      } else {
+        setErro("Email ou senha incorretos.");
+      }
       setLoading(false);
       return;
     }
@@ -30,9 +35,16 @@ export default function LoginPage() {
     // Verificar status do perfil e redirecionar de acordo
     const { data: profile } = await supabase
       .from("profiles")
-      .select("status, role")
+      .select("status, role, ativo")
       .eq("id", data.user.id)
       .single();
+
+    if (profile?.ativo === false) {
+      await supabase.auth.signOut();
+      setErro("Conta inativa. Entre em contato com o administrador.");
+      setLoading(false);
+      return;
+    }
 
     const status = profile?.status ?? "pendente";
 
