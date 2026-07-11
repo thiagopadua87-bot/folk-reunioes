@@ -25,7 +25,7 @@ const FORM_VAZIO: FormState = {
   nome: "", telefone: "", email: "", tipo: "Síndico Morador", ativo: true,
 };
 
-export default function SindicosGestoresTab() {
+export default function SindicosGestoresTab({ canEdit = true }: { canEdit?: boolean }) {
   const [registros, setRegistros] = useState<SindicoGestor[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -202,12 +202,14 @@ export default function SindicosGestoresTab() {
         <p className="text-sm text-gray-500">
           {carregando ? "Carregando..." : `${registros.length} registro${registros.length !== 1 ? "s" : ""}`}
         </p>
-        <button
-          onClick={abrirNovo}
-          className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
-        >
-          + Novo síndico/gestor
-        </button>
+        {canEdit && (
+          <button
+            onClick={abrirNovo}
+            className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
+          >
+            + Novo síndico/gestor
+          </button>
+        )}
       </div>
 
       {erro && <Alert status="error" message={erro} />}
@@ -249,12 +251,14 @@ export default function SindicosGestoresTab() {
                   </td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => abrirEditar(r)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
-                      >
-                        Editar
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => abrirEditar(r)}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
+                        >
+                          Editar
+                        </button>
+                      )}
                       <button
                         onClick={() => toggleAtivo(r)}
                         className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${

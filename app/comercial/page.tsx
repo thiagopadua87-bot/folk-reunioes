@@ -1,40 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import VendasTab from "./VendasTab";
 import PipelineTab from "./PipelineTab";
 import DashboardCRMTab from "./DashboardCRMTab";
 import type { PreenchimentoVenda, PipelineItem } from "@/lib/comercial";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import { usePermissions, AccessDenied } from "@/app/components/PermissionsProvider";
+import type { ScreenKey } from "@/lib/permissions";
 
-type Aba = "pipeline" | "vendas" | "dashboard";
+type Aba = "pipeline" | "vendas" | "dashboard" | "comissoes";
 
-const ABAS: { value: Aba; label: string; descricao: string }[] = [
+const ABAS_BASE: { value: Aba; label: string; descricao: string }[] = [
   { value: "pipeline",  label: "Pipeline",  descricao: "Propostas em andamento e potencial de receita" },
   { value: "vendas",    label: "Vendas",    descricao: "Contratos fechados e receita realizada" },
   { value: "dashboard", label: "Dashboard", descricao: "Visão gerencial do funil e atividades comerciais" },
 ];
 
-export default function ComercialPage() {
-  const [aba, setAba] = useState<Aba>("pipeline");
-  const [preenchimento, setPreenchimento] = useState<PreenchimentoVenda | null>(null);
-  const abaAtual = ABAS.find((a) => a.value === aba)!;
-  const { guardCancel } = useUnsavedChanges();
+const ABA_COMISSOES = { value: "comissoes" as Aba, label: "Comissões", descricao: "Painel de comissões da equipe comercial" };
 
-  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); }
+const TAB_KEYS: Record<Aba, ScreenKey> = {
+  pipeline:  "comercial.pipeline",
+  vendas:    "comercial.vendas",
+  dashboard: "comercial.dashboard",
+  comissoes: "comercial.comissoes",
+};
+
+function ComercialPageContent() {
+  const searchParams = useSearchParams();
+  const router       = useRouter();
+  const { guardCancel } = useUnsavedChanges();
+  const { isAdmin, perm } = usePermissions();
+  const [preenchimento, setPreenchimento] = useState<PreenchimentoVenda | null>(null);
+
+  const ABAS = isAdmin ? [...ABAS_BASE, ABA_COMISSOES] : ABAS_BASE;
+
+  const abaParam = searchParams.get("aba") as Aba | null;
+  const aba: Aba = (abaParam === "comissoes" && !isAdmin) ? "pipeline" : (abaParam ?? "pipeline");
+  const abaAtual = ABAS.find((a) => a.value === aba) ?? ABAS[0];
+  const tabPerm = perm(TAB_KEYS[aba]);
+
+  function trocarAba(nova: Aba) {
+    guardCancel(() => router.replace(`/comercial?aba=${nova}`));
+  }
 
   function handleConverter(item: PipelineItem) {
     setPreenchimento({
-      pipeline_id:  item.id,
-      cliente:      item.cliente,
-      vendedor_id:  item.vendedor_id,
+      pipeline_id:       item.id,
+      cliente:           item.cliente,
+      vendedor_id:       item.vendedor_id,
       valor_implantacao: item.valor_implantacao,
       valor_mensal:      item.valor_mensal,
-      servicos:     item.servicos ?? [],
-      observacoes:  item.observacoes,
-      indicado_por: item.indicado_por,
+      servicos:          item.servicos ?? [],
+      observacoes:       item.observacoes,
+      indicado_por:      item.indicado_por,
     });
-    setAba("vendas");
+    router.replace("/comercial?aba=vendas");
   }
 
   const isWide = aba === "pipeline";
@@ -60,19 +82,43 @@ export default function ComercialPage() {
         ))}
       </div>
 
-      {aba === "pipeline" && (
-        <PipelineTab
-          onConverter={handleConverter}
-          onIrParaVendas={() => setAba("vendas")}
-        />
+      {!tabPerm.can_view ? <AccessDenied /> : (
+        <>
+          {aba === "pipeline" && (
+            <PipelineTab
+              onConverter={handleConverter}
+              onIrParaVendas={() => router.replace("/comercial?aba=vendas")}
+              canEdit={tabPerm.can_edit}
+              canDelete={tabPerm.can_delete}
+            />
+          )}
+          {aba === "vendas" && (
+            <VendasTab
+              preenchimento={preenchimento}
+              onPreenchimentoUsado={() => setPreenchimento(null)}
+              canEdit={tabPerm.can_edit}
+              canDelete={tabPerm.can_delete}
+            />
+          )}
+          {aba === "dashboard" && <DashboardCRMTab />}
+          {aba === "comissoes" && (
+            <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white">
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-400">Painel de Comissões</p>
+                <p className="mt-1 text-xs text-gray-300">Em breve</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
-      {aba === "vendas" && (
-        <VendasTab
-          preenchimento={preenchimento}
-          onPreenchimentoUsado={() => setPreenchimento(null)}
-        />
-      )}
-      {aba === "dashboard" && <DashboardCRMTab />}
     </main>
+  );
+}
+
+export default function ComercialPage() {
+  return (
+    <Suspense fallback={null}>
+      <ComercialPageContent />
+    </Suspense>
   );
 }

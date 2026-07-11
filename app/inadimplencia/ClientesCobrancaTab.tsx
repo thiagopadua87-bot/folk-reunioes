@@ -178,12 +178,13 @@ function TimelineHistorico({ acoes, loading }: { acoes: InadimplenciaAcao[]; loa
 // ── CardCliente ────────────────────────────────────────────────────
 
 function CardCliente({
-  cliente, tiposAcao, usuarioId, onRecarregar,
+  cliente, tiposAcao, usuarioId, onRecarregar, canEdit,
 }: {
   cliente: ClienteCobranca;
   tiposAcao: TipoAcaoCobranca[];
   usuarioId: string;
   onRecarregar: () => Promise<void>;
+  canEdit: boolean;
 }) {
   const [expandido,    setExpandido] = useState(false);
   const [acoes,        setAcoes]     = useState<InadimplenciaAcao[]>([]);
@@ -307,12 +308,14 @@ function CardCliente({
         <div className="space-y-5 border-t border-gray-100 bg-gray-50/40 px-5 pb-6 pt-4">
           {/* Form de ação */}
           {!mostraForm ? (
-            <button
-              onClick={() => setMF(true)}
-              className="rounded-xl bg-folk px-4 py-2 text-sm font-semibold text-white"
-            >
-              + Registrar ação
-            </button>
+            canEdit ? (
+              <button
+                onClick={() => setMF(true)}
+                className="rounded-xl bg-folk px-4 py-2 text-sm font-semibold text-white"
+              >
+                + Registrar ação
+              </button>
+            ) : null
           ) : (
             <div className="space-y-3 rounded-2xl border border-folk/20 bg-folk/5 p-4">
               <div className="flex items-center justify-between gap-2">
@@ -483,7 +486,7 @@ function CardCliente({
 
 // ── Componente principal ───────────────────────────────────────────
 
-export default function ClientesCobrancaTab() {
+export default function ClientesCobrancaTab({ canEdit = true }: { canEdit?: boolean }) {
   const [faturas,      setFaturas]      = useState<Fatura[]>([]);
   const [ultimasAcoes, setUltimasAcoes] = useState<Map<string, UltimaAcaoFatura>>(new Map());
   const [responsaveis, setResponsaveis] = useState<InadimplenciaResponsavel[]>([]);
@@ -901,6 +904,7 @@ export default function ClientesCobrancaTab() {
                   tiposAcao={tiposAcao}
                   usuarioId={usuarioId}
                   onRecarregar={carregar}
+                  canEdit={canEdit}
                 />
               ))}
             </div>

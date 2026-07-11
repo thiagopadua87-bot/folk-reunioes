@@ -102,6 +102,8 @@ interface KanbanPipelineProps {
   onConverter: (item: PipelineItem) => void;
   onIrParaVendas: () => void;
   onMoverCard: (itemId: string, novoStatus: StatusPipeline, statusAnterior: StatusPipeline) => Promise<void>;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 // ── Componente principal ─────────────────────────────────────
@@ -110,6 +112,7 @@ export default function KanbanPipeline({
   registros, allCompetitors, allSindicosGestores,
   excluindo, convertendo,
   onEditar, onExcluir, onConverter, onIrParaVendas, onMoverCard,
+  canEdit = true, canDelete = true,
 }: KanbanPipelineProps) {
   const [mostrarEncerradas, setMostrarEncerradas] = useState(false);
   const [draggedId, setDraggedId]           = useState<string | null>(null);
@@ -220,6 +223,8 @@ export default function KanbanPipeline({
                       onExcluir={onExcluir}
                       onConverter={onConverter}
                       onIrParaVendas={onIrParaVendas}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
                       onDragStart={() => setDraggedId(item.id)}
                       onDragEnd={() => { setDraggedId(null); setDropTarget(null); }}
                     />
@@ -248,6 +253,8 @@ interface KanbanCardProps {
   onExcluir: (id: string) => void;
   onConverter: (item: PipelineItem) => void;
   onIrParaVendas: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
 }
@@ -256,6 +263,7 @@ function KanbanCard({
   item, allCompetitors, allSindicosGestores,
   isDragging, isMovendo, excluindo, convertendo,
   onEditar, onExcluir, onConverter, onIrParaVendas,
+  canEdit = true, canDelete = true,
   onDragStart, onDragEnd,
 }: KanbanCardProps) {
   const sindico = item.sindico_gestor_id
@@ -420,12 +428,14 @@ function KanbanCard({
 
         {/* Ações do card */}
         <div className="mt-2 flex items-center justify-between gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={() => onEditar(item)}
-            className="flex-1 rounded-lg border border-gray-200 py-1 text-[10px] font-semibold text-gray-500 hover:border-folk/30 hover:text-folk transition-colors"
-          >
-            Editar
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => onEditar(item)}
+              className="flex-1 rounded-lg border border-gray-200 py-1 text-[10px] font-semibold text-gray-500 hover:border-folk/30 hover:text-folk transition-colors"
+            >
+              Editar
+            </button>
+          )}
           {item.convertido_em_venda ? (
             <button
               onClick={onIrParaVendas}
@@ -442,13 +452,15 @@ function KanbanCard({
               {convertendo === item.id ? "..." : "Converter"}
             </button>
           )}
-          <button
-            onClick={() => onExcluir(item.id)}
-            disabled={excluindo === item.id}
-            className="rounded-lg border border-red-100 px-2 py-1 text-[10px] font-semibold text-red-400 hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            {excluindo === item.id ? "..." : "✕"}
-          </button>
+          {canDelete && (
+            <button
+              onClick={() => onExcluir(item.id)}
+              disabled={excluindo === item.id}
+              className="rounded-lg border border-red-100 px-2 py-1 text-[10px] font-semibold text-red-400 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {excluindo === item.id ? "..." : "✕"}
+            </button>
+          )}
         </div>
       </div>
     </div>

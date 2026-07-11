@@ -62,7 +62,7 @@ const FORM_VAZIO: FormState = { data_inicio: "", cliente: "", servicos: [], situ
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
-export default function ProjetosTab() {
+export default function ProjetosTab({ situacaoInicial = "", canEdit = true, canDelete = true }: { situacaoInicial?: SituacaoProjeto | ""; canEdit?: boolean; canDelete?: boolean }) {
   const [registros, setRegistros]   = useState<Projeto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro]             = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function ProjetosTab() {
   const [salvando, setSalvando]     = useState(false);
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
-  const [filtros, setFiltros]       = useState<FiltrosProjetos>({ situacao: "" });
+  const [filtros, setFiltros]       = useState<FiltrosProjetos>({ situacao: situacaoInicial });
   const [logs, setLogs]             = useState<ProjetoLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
 
@@ -246,7 +246,7 @@ export default function ProjetosTab() {
 
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} projeto${registros.length !== 1 ? "s" : ""}`}</p>
-        <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">+ Novo projeto</button>
+        {canEdit && <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">+ Novo projeto</button>}
       </div>
 
       {erro && <Alert status="error" message={erro} />}
@@ -289,10 +289,8 @@ export default function ProjetosTab() {
                   <td className="py-3 pr-6">
                     <div className="flex items-center gap-1.5 whitespace-nowrap">
                       <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
-                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2.5 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
-                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-                        {excluindo === r.id ? "..." : "Excluir"}
-                      </button>
+                      {canEdit   && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2.5 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>}
+                      {canDelete && <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2.5 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">{excluindo === r.id ? "..." : "Excluir"}</button>}
                     </div>
                   </td>
                 </tr>

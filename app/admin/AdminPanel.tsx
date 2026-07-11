@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { atualizarStatusUsuario, resetarSenha } from "./actions";
 import type { Profile, UserStatus } from "@/lib/profiles";
+import PermissionsMatrix from "./PermissionsMatrix";
 
 const statusLabel: Record<UserStatus, string> = {
   pendente: "Pendente",
@@ -22,6 +23,7 @@ function UserRow({ profile }: { profile: Profile }) {
   const [sucesso, setSucesso]     = useState<string | null>(null);
   const [resetando, setResetando] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
+  const [showPerms, setShowPerms] = useState(false);
 
   function handleAction(status: UserStatus) {
     setErro(null); setSucesso(null);
@@ -49,7 +51,8 @@ function UserRow({ profile }: { profile: Profile }) {
   }
 
   return (
-    <tr className={`border-b border-gray-100 last:border-0 ${isPending ? "opacity-60" : ""}`}>
+    <>
+    <tr className={`border-b border-gray-100 ${isPending ? "opacity-60" : ""}`}>
       <td className="py-3.5 pl-6 pr-4 text-sm font-medium text-gray-900">{profile.nome}</td>
       <td className="py-3.5 pr-4 text-sm text-gray-500">{profile.email}</td>
       <td className="py-3.5 pr-4">
@@ -109,10 +112,31 @@ function UserRow({ profile }: { profile: Profile }) {
           )}
         </div>
 
+        {profile.role !== "admin" && (
+          <button
+            onClick={() => setShowPerms(!showPerms)}
+            className="mt-1 self-start rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-folk/30 hover:text-folk disabled:opacity-50"
+          >
+            {showPerms ? "Fechar permissões" : "Permissões"}
+          </button>
+        )}
+
         {erro    && <p className="mt-1.5 text-xs text-red-600">{erro}</p>}
         {sucesso && <p className="mt-1.5 text-xs text-green-600">{sucesso}</p>}
       </td>
     </tr>
+    {showPerms && (
+      <tr>
+        <td colSpan={5} className="px-6 pb-4 bg-gray-50/50">
+          <PermissionsMatrix
+            userId={profile.id}
+            userName={profile.nome}
+            onClose={() => setShowPerms(false)}
+          />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 

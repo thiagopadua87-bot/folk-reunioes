@@ -318,9 +318,11 @@ function getHojeInicio(): Date {
 interface PipelineTabProps {
   onConverter: (item: PipelineItem) => void;
   onIrParaVendas: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTabProps) {
+export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = true, canDelete = true }: PipelineTabProps) {
   const [registros, setRegistros]   = useState<PipelineItem[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -1240,9 +1242,11 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               Lista
             </button>
           </div>
-          <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
-            + Nova proposta
-          </button>
+          {canEdit && (
+            <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
+              + Nova proposta
+            </button>
+          )}
         </div>
       </div>
 
@@ -1267,6 +1271,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
           onConverter={handleConverter}
           onIrParaVendas={onIrParaVendas}
           onMoverCard={handleMoverCard}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       )}
 
@@ -1280,6 +1286,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
               excluindo={excluindo} convertendo={convertendo}
               onEditar={abrirEditar} onExcluir={handleSolicitarExclusao}
               onConverter={handleConverter} onIrParaVendas={onIrParaVendas}
+              canEdit={canEdit} canDelete={canDelete}
             />
           ))}
           {propostasDeclinadas.length > 0 && (
@@ -1358,6 +1365,7 @@ export default function PipelineTab({ onConverter, onIrParaVendas }: PipelineTab
 function PropostaCard({
   r, allCompetitors, allSindicosGestores, excluindo, convertendo,
   onEditar, onExcluir, onConverter, onIrParaVendas,
+  canEdit = true, canDelete = true,
 }: {
   r: PipelineItem;
   allCompetitors: Competitor[];
@@ -1368,6 +1376,8 @@ function PropostaCard({
   onExcluir: (id: string) => void;
   onConverter: (r: PipelineItem) => void;
   onIrParaVendas: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   const winnerName = r.winner_competitor_id
     ? (() => { const c = allCompetitors.find((x) => x.id === r.winner_competitor_id); return c ? (c.trade_name || c.legal_name) : null; })()
@@ -1444,10 +1454,8 @@ function PropostaCard({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <button onClick={() => onEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-            <button onClick={() => onExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-              {excluindo === r.id ? "..." : "Excluir"}
-            </button>
+            {canEdit   && <button onClick={() => onEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>}
+            {canDelete && <button onClick={() => onExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">{excluindo === r.id ? "..." : "Excluir"}</button>}
           </div>
           {r.convertido_em_venda ? (
             <button onClick={onIrParaVendas} className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100">

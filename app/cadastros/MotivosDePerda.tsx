@@ -19,7 +19,7 @@ interface FormState {
 
 const FORM_VAZIO: FormState = { nome: "", status: "ativo" };
 
-export default function MotivosDePerda() {
+export default function MotivosDePerda({ canEdit = true }: { canEdit?: boolean }) {
   const [registros, setRegistros]   = useState<MotivoPerda[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro]             = useState<string | null>(null);
@@ -237,12 +237,14 @@ export default function MotivosDePerda() {
             ? "Carregando..."
             : `${registros.length} motivo${registros.length !== 1 ? "s" : ""}`}
         </p>
-        <button
-          onClick={abrirNovo}
-          className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
-        >
-          + Novo motivo
-        </button>
+        {canEdit && (
+          <button
+            onClick={abrirNovo}
+            className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
+          >
+            + Novo motivo
+          </button>
+        )}
       </div>
 
       {erro && <Alert status="error" message={erro} />}
@@ -297,12 +299,14 @@ export default function MotivosDePerda() {
                   </td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => abrirEditar(r)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
-                      >
-                        Editar
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => abrirEditar(r)}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk"
+                        >
+                          Editar
+                        </button>
+                      )}
                       {r.status === "ativo" ? (
                         <button
                           onClick={() => setConfirmando(r.id)}

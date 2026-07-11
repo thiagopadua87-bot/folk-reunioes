@@ -105,6 +105,8 @@ function CheckboxServicos({ value, onChange }: { value: string[]; onChange: (v: 
 interface VendasTabProps {
   preenchimento?: PreenchimentoVenda | null;
   onPreenchimentoUsado?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 function formDePreenchimento(p: PreenchimentoVenda): FormState {
@@ -122,7 +124,7 @@ function formDePreenchimento(p: PreenchimentoVenda): FormState {
   };
 }
 
-export default function VendasTab({ preenchimento, onPreenchimentoUsado }: VendasTabProps) {
+export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit = true, canDelete = true }: VendasTabProps) {
   const [registros, setRegistros] = useState<Venda[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -501,9 +503,11 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
             </div>
           )}
         </div>
-        <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
-          + Nova venda
-        </button>
+        {canEdit && (
+          <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
+            + Nova venda
+          </button>
+        )}
       </div>
 
       {erro && <Alert status="error" message={erro} />}
@@ -581,10 +585,8 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado }: Venda
                   <td className="py-3 pr-3">
                     <div className="flex items-center gap-1 flex-wrap">
                       <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
-                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>
-                      <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-                        {excluindo === r.id ? "..." : "Excluir"}
-                      </button>
+                      {canEdit   && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>}
+                      {canDelete && <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">{excluindo === r.id ? "..." : "Excluir"}</button>}
                     </div>
                   </td>
                 </tr>

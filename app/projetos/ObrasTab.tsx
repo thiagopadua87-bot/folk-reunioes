@@ -93,7 +93,7 @@ const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
 // ── Componente principal ─────────────────────────────────────
 
-export default function ObrasTab() {
+export default function ObrasTab({ situacaoInicial = "", canEdit = true, canDelete = true }: { situacaoInicial?: SituacaoObra | ""; canEdit?: boolean; canDelete?: boolean }) {
   const [obras, setObras]           = useState<Obra[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro]             = useState<string | null>(null);
@@ -103,7 +103,7 @@ export default function ObrasTab() {
   const [salvando, setSalvando]     = useState(false);
   const [erroForm, setErroForm]     = useState<string | null>(null);
   const [excluindo, setExcluindo]   = useState<string | null>(null);
-  const [filtros, setFiltros]       = useState<FiltrosObras>({ situacao: "", equipe: "" });
+  const [filtros, setFiltros]       = useState<FiltrosObras>({ situacao: situacaoInicial, equipe: "" });
   const [historicoKey, setHistoricoKey] = useState(0);
   const [tecnicos, setTecnicos]         = useState<Tecnico[]>([]);
   const [terceirizados, setTerceirizados] = useState<Terceirizado[]>([]);
@@ -382,10 +382,8 @@ export default function ObrasTab() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button onClick={() => abrirEditar(o)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
-            <button onClick={() => handleExcluir(o.id)} disabled={excluindo === o.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">
-              {excluindo === o.id ? "..." : "Excluir"}
-            </button>
+            {canEdit   && <button onClick={() => abrirEditar(o)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>}
+            {canDelete && <button onClick={() => handleExcluir(o.id)} disabled={excluindo === o.id} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">{excluindo === o.id ? "..." : "Excluir"}</button>}
           </div>
         </div>
       </div>
@@ -415,7 +413,7 @@ export default function ObrasTab() {
 
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">{carregando ? "Carregando..." : contadorTexto}</p>
-        <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">+ Nova obra</button>
+        {canEdit && <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">+ Nova obra</button>}
       </div>
 
       {erro && <Alert status="error" message={erro} />}

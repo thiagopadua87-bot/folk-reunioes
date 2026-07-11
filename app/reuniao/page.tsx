@@ -9,6 +9,7 @@ import {
   type ReuniaoV2,
 } from "@/lib/reunioes-v2";
 import { supabase } from "@/lib/supabase";
+import { usePermission, AccessDenied } from "@/app/components/PermissionsProvider";
 
 const INPUT =
   "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full disabled:opacity-60 disabled:cursor-not-allowed";
@@ -35,7 +36,7 @@ export default function ReunioesPage() {
   const [reunioes, setReunioes] = useState<ReuniaoComContagem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can_view, can_edit, can_delete } = usePermission("reunioes");
 
   const [modalNova, setModalNova] = useState(false);
   const [form, setForm] = useState({
@@ -94,19 +95,6 @@ export default function ReunioesPage() {
     carregar();
   }, [carregar]);
 
-  useEffect(() => {
-    async function checkAdmin() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      setIsAdmin(profile?.role === "admin");
-    }
-    checkAdmin();
-  }, []);
 
   async function handleCriar(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +131,8 @@ export default function ReunioesPage() {
     }
   }
 
+  if (!can_view) return <AccessDenied />;
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
@@ -150,16 +140,18 @@ export default function ReunioesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Reuniões</h1>
           <p className="mt-1 text-sm text-gray-500">Registro e acompanhamento de encaminhamentos</p>
         </div>
-        <button
-          onClick={() => {
-            setForm({ titulo: "Reunião Semanal", data: new Date().toISOString().split("T")[0], horario_inicio: "", responsavel: "" });
-            setErroForm(null);
-            setModalNova(true);
-          }}
-          className="rounded-2xl bg-folk-gradient px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
-        >
-          + Nova Reunião
-        </button>
+        {can_edit && (
+          <button
+            onClick={() => {
+              setForm({ titulo: "Reunião Semanal", data: new Date().toISOString().split("T")[0], horario_inicio: "", responsavel: "" });
+              setErroForm(null);
+              setModalNova(true);
+            }}
+            className="rounded-2xl bg-folk-gradient px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
+          >
+            + Nova Reunião
+          </button>
+        )}
       </div>
 
       {erro && (
@@ -218,7 +210,7 @@ export default function ReunioesPage() {
                 >
                   Abrir
                 </button>
-                {isAdmin && (
+                {can_delete && (
                   confirmacaoExcluir === r.id ? (
                     <span className="flex items-center gap-1.5">
                       <button

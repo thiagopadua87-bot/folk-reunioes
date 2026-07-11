@@ -20,7 +20,7 @@ interface FormState {
 
 const FORM_VAZIO: FormState = { nome: "", telefone: "", email: "", ativo: true };
 
-export default function VendedoresTab() {
+export default function VendedoresTab({ canEdit = true }: { canEdit?: boolean }) {
   const [registros, setRegistros] = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -135,9 +135,11 @@ export default function VendedoresTab() {
 
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">{carregando ? "Carregando..." : `${registros.length} vendedor${registros.length !== 1 ? "es" : ""}`}</p>
-        <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
-          + Novo vendedor
-        </button>
+        {canEdit && (
+          <button onClick={abrirNovo} className="rounded-2xl bg-folk-gradient px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]">
+            + Novo vendedor
+          </button>
+        )}
       </div>
 
       {erro && <Alert status="error" message={erro} />}
@@ -171,7 +173,7 @@ export default function VendedoresTab() {
                   </td>
                   <td className="py-3.5 pr-6">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>
+                      {canEdit && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>}
                       <button onClick={() => toggleAtivo(r)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${r.ativo ? "border-amber-100 text-amber-600 hover:bg-amber-50" : "border-green-100 text-green-600 hover:bg-green-50"}`}>
                         {r.ativo ? "Inativar" : "Ativar"}
                       </button>

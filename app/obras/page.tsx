@@ -2,26 +2,27 @@
 
 import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import ProjetosTab from "./ProjetosTab";
+import ObrasTab from "@/app/projetos/ObrasTab";
+import DashboardObrasTab from "@/app/projetos/DashboardObrasTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { usePermissions, AccessDenied } from "@/app/components/PermissionsProvider";
 import type { ScreenKey } from "@/lib/permissions";
 
-type Aba = "andamento" | "concluidos" | "dashboard";
+type Aba = "andamento" | "concluidas" | "dashboard";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "andamento",  label: "Em andamento", descricao: "Projetos em execução e entregues ao comercial" },
-  { value: "concluidos", label: "Concluídos",   descricao: "Projetos entregues e concluídos" },
-  { value: "dashboard",  label: "Dashboard",    descricao: "Visão gerencial dos projetos" },
+  { value: "andamento",  label: "Em andamento", descricao: "Obras em execução, paralisadas e a executar" },
+  { value: "concluidas", label: "Concluídas",   descricao: "Obras finalizadas e entregues" },
+  { value: "dashboard",  label: "Dashboard",    descricao: "Inteligência operacional, riscos e saúde das obras" },
 ];
 
 const TAB_KEYS: Record<Aba, ScreenKey> = {
-  andamento:  "projetos.andamento",
-  concluidos: "projetos.concluidos",
-  dashboard:  "projetos.dashboard",
+  andamento:  "obras.andamento",
+  concluidas: "obras.concluidas",
+  dashboard:  "obras.dashboard",
 };
 
-function ProjetosPageContent() {
+function ObrasPageContent() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const { guardCancel } = useUnsavedChanges();
@@ -32,13 +33,13 @@ function ProjetosPageContent() {
   const tabPerm = perm(TAB_KEYS[aba]);
 
   function trocarAba(nova: Aba) {
-    guardCancel(() => router.replace(`/projetos?aba=${nova}`));
+    guardCancel(() => router.replace(`/obras?aba=${nova}`));
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Projetos</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Obras</h1>
         <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
       </div>
 
@@ -58,26 +59,19 @@ function ProjetosPageContent() {
 
       {!tabPerm.can_view ? <AccessDenied /> : (
         <>
-          {aba === "andamento"  && <ProjetosTab situacaoInicial="em_execucao" canEdit={tabPerm.can_edit} canDelete={tabPerm.can_delete} />}
-          {aba === "concluidos" && <ProjetosTab situacaoInicial="entregue_ao_comercial" canEdit={tabPerm.can_edit} canDelete={tabPerm.can_delete} />}
-          {aba === "dashboard"  && (
-            <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white">
-              <div className="text-center">
-                <p className="text-sm font-semibold text-gray-400">Dashboard de Projetos</p>
-                <p className="mt-1 text-xs text-gray-300">Em breve</p>
-              </div>
-            </div>
-          )}
+          {aba === "andamento"  && <ObrasTab canEdit={tabPerm.can_edit} canDelete={tabPerm.can_delete} />}
+          {aba === "concluidas" && <ObrasTab situacaoInicial="finalizada" canEdit={tabPerm.can_edit} canDelete={tabPerm.can_delete} />}
+          {aba === "dashboard"  && <DashboardObrasTab />}
         </>
       )}
     </main>
   );
 }
 
-export default function ProjetosPage() {
+export default function ObrasPage() {
   return (
     <Suspense fallback={null}>
-      <ProjetosPageContent />
+      <ObrasPageContent />
     </Suspense>
   );
 }

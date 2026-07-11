@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import ClientesCobrancaTab from "./ClientesCobrancaTab";
 import DashboardCobrancaTab from "./DashboardCobrancaTab";
 import ConfiguracoesCobrancaTab from "./ConfiguracoesCobrancaTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import { usePermissions, AccessDenied } from "@/app/components/PermissionsProvider";
+import type { ScreenKey } from "@/lib/permissions";
 
 type Aba = "faturas" | "dashboard" | "configuracoes";
 
@@ -14,12 +17,25 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
   { value: "configuracoes", label: "Configurações", descricao: "Tipos de ação e parâmetros do módulo de cobrança" },
 ];
 
-export default function InadimplenciaPage() {
-  const [aba, setAba] = useState<Aba>("faturas");
-  const abaAtual = ABAS.find((a) => a.value === aba)!;
-  const { guardCancel } = useUnsavedChanges();
+const TAB_KEYS: Record<Aba, ScreenKey> = {
+  faturas:       "cobranca.clientes",
+  dashboard:     "cobranca.dashboard",
+  configuracoes: "cobranca.configuracoes",
+};
 
-  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); }
+function InadimplenciaPageContent() {
+  const searchParams = useSearchParams();
+  const router       = useRouter();
+  const { guardCancel } = useUnsavedChanges();
+  const { perm } = usePermissions();
+
+  const aba = (searchParams.get("aba") ?? "faturas") as Aba;
+  const abaAtual = ABAS.find((a) => a.value === aba) ?? ABAS[0];
+  const tabPerm = perm(TAB_KEYS[aba]);
+
+  function trocarAba(nova: Aba) {
+    guardCancel(() => router.replace(`/inadimplencia?aba=${nova}`));
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -42,9 +58,21 @@ export default function InadimplenciaPage() {
         ))}
       </div>
 
-      {aba === "faturas"       && <ClientesCobrancaTab />}
-      {aba === "dashboard"     && <DashboardCobrancaTab />}
-      {aba === "configuracoes" && <ConfiguracoesCobrancaTab />}
+      {!tabPerm.can_view ? <AccessDenied /> : (
+        <>
+          {aba === "faturas"       && <ClientesCobrancaTab canEdit={tabPerm.can_edit} />}
+          {aba === "dashboard"     && <DashboardCobrancaTab />}
+          {aba === "configuracoes" && <ConfiguracoesCobrancaTab canEdit={tabPerm.can_edit} />}
+        </>
+      )}
     </main>
+  );
+}
+
+export default function InadimplenciaPage() {
+  return (
+    <Suspense fallback={null}>
+      <InadimplenciaPageContent />
+    </Suspense>
   );
 }
