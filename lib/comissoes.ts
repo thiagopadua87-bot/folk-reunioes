@@ -628,8 +628,50 @@ export async function listarComissoesHistorico(filtros?: {
 
 // ── Ações sobre comissões ─────────────────────────────────────
 
+export async function alterarStatusComissao(
+  id: string,
+  novoStatus: StatusComissao,
+  opts?: { competencia?: string; motivo?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const now    = new Date().toISOString();
+    const update: Record<string, unknown> = { status: novoStatus, updated_at: now };
+
+    if (novoStatus === "cancelada") {
+      update.motivo_cancelamento = opts?.motivo ?? "";
+    }
+
+    if (opts?.competencia && (novoStatus === "elegivel" || novoStatus === "na_competencia")) {
+      update.competencia = opts.competencia;
+      await buscarOuCriarCompetencia(opts.competencia);
+    }
+
+    const { error } = await supabase
+      .from("comissoes")
+      .update(update)
+      .eq("id", id);
+
+    if (error) return { ok: false, error: error.message };
+
+    // Se liberando: marca gates na venda para manter consistência
+    if (novoStatus === "elegivel") {
+      const { data: c } = await supabase
+        .from("comissoes").select("venda_id").eq("id", id).single();
+      if (c?.venda_id) {
+        await supabase
+          .from("vendas")
+          .update({ contrato_assinado: true, primeira_nf: true })
+          .eq("id", c.venda_id);
+      }
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro." };
+  }
+}
+
 export async function cancelarComissao(id: string, motivo: string): Promise<void> {
-  
   const { error } = await supabase
     .from("comissoes")
     .update({ status: "cancelada", motivo_cancelamento: motivo, updated_at: new Date().toISOString() })

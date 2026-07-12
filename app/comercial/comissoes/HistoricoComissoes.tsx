@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  listarComissoesHistorico, listarCompetencias, cancelarComissaoAction,
+  listarComissoesHistorico, listarCompetencias, alterarStatusComissao,
   type Comissao, type StatusComissao, type Competencia,
   labelCompetencia, labelStatusComissao,
 } from "@/lib/comissoes";
@@ -26,6 +26,10 @@ const BADGE_TIPO: Record<string, string> = {
   indicador: "bg-amber-100 text-amber-700",
 };
 
+const TODOS_STATUS: StatusComissao[] = [
+  "aguardando_liberacao", "elegivel", "na_competencia", "aprovada", "paga", "cancelada",
+];
+
 export default function HistoricoComissoes() {
   const { isAdmin } = usePermissions();
   const [comissoes,    setComissoes]    = useState<Comissao[]>([]);
@@ -33,14 +37,17 @@ export default function HistoricoComissoes() {
   const [competencias, setCompetencias] = useState<Competencia[]>([]);
   const [carregando,   setCarregando]   = useState(true);
 
-  const [filtroVend, setFiltroVend]     = useState("");
-  const [filtroComp, setFiltroComp]     = useState("");
+  const [filtroVend,   setFiltroVend]   = useState("");
+  const [filtroComp,   setFiltroComp]   = useState("");
   const [filtroStatus, setFiltroStatus] = useState<StatusComissao | "">("");
 
-  const [cancelando, setCancelando]   = useState<string | null>(null);
-  const [motivoCanc, setMotivoCanc]   = useState("");
-  const [salvandoCanc, setSalvandoCanc] = useState(false);
-  const [erro, setErro]               = useState<string | null>(null);
+  // modal alterar status
+  const [editando,     setEditando]     = useState<Comissao | null>(null);
+  const [novoStatus,   setNovoStatus]   = useState<StatusComissao>("aguardando_liberacao");
+  const [compSel,      setCompSel]      = useState("");
+  const [motivo,       setMotivo]       = useState("");
+  const [salvando,     setSalvando]     = useState(false);
+  const [erro,         setErro]         = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -66,14 +73,44 @@ export default function HistoricoComissoes() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  async function confirmarCancelamento() {
-    if (!cancelando || !motivoCanc.trim()) return;
-    setSalvandoCanc(true);
-    const result = await cancelarComissaoAction(cancelando, motivoCanc);
-    setSalvandoCanc(false);
+  function abrirModal(c: Comissao) {
+    setEditando(c);
+    // pré-seleciona o próximo status lógico, ou o atual como fallback
+    const proximo = proximoStatus(c.status);
+    setNovoStatus(proximo);
+    setCompSel(c.competencia ?? "");
+    setMotivo("");
+    setErro(null);
+  }
+
+  function proximoStatus(atual: StatusComissao): StatusComissao {
+    const fluxo: StatusComissao[] = [
+      "aguardando_liberacao", "elegivel", "na_competencia", "aprovada", "paga",
+    ];
+    const idx = fluxo.indexOf(atual);
+    return idx >= 0 && idx + 1 < fluxo.length ? fluxo[idx + 1] : atual;
+  }
+
+  const precisaCompetencia = novoStatus === "elegivel" || novoStatus === "na_competencia";
+  const precisaMotivo      = novoStatus === "cancelada";
+
+  const podeSalvar =
+    editando !== null &&
+    novoStatus !== editando.status &&
+    (!precisaCompetencia || compSel.trim() !== "") &&
+    (!precisaMotivo      || motivo.trim()  !== "");
+
+  async function confirmarAlteracao() {
+    if (!editando || !podeSalvar) return;
+    setSalvando(true);
+    setErro(null);
+    const result = await alterarStatusComissao(editando.id, novoStatus, {
+      competencia: precisaCompetencia ? compSel : undefined,
+      motivo:      precisaMotivo      ? motivo  : undefined,
+    });
+    setSalvando(false);
     if (!result.ok) { setErro(result.error ?? "Erro."); return; }
-    setCancelando(null);
-    setMotivoCanc("");
+    setEditando(null);
     carregar();
   }
 
@@ -111,16 +148,15 @@ export default function HistoricoComissoes() {
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
         >
           <option value="">Todos os status</option>
-          <option value="aguardando_liberacao">Aguardando Liberação</option>
-          <option value="elegivel">Elegível</option>
-          <option value="na_competencia">Na Competência</option>
-          <option value="aprovada">Aprovada</option>
-          <option value="paga">Paga</option>
-          <option value="cancelada">Cancelada</option>
+          {TODOS_STATUS.map((s) => (
+            <option key={s} value={s}>{labelStatusComissao(s)}</option>
+          ))}
         </select>
       </div>
 
-      {erro && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {erro && !editando && (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>
+      )}
 
       {carregando ? (
         <p className="text-sm text-gray-400">Carregando...</p>
@@ -166,10 +202,11 @@ export default function HistoricoComissoes() {
                     <td className="py-3 pr-5 text-right">
                       {c.status !== "paga" && c.status !== "cancelada" && (
                         <button
-                          onClick={() => { setCancelando(c.id); setMotivoCanc(""); }}
-                          className="text-xs font-semibold text-red-500 hover:underline"
+                          onClick={() => abrirModal(c)}
+                          className="rounded-lg px-2 py-1 text-xs font-bold text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                          title="Alterar status"
                         >
-                          Cancelar
+                          ···
                         </button>
                       )}
                     </td>
@@ -181,35 +218,77 @@ export default function HistoricoComissoes() {
         </div>
       )}
 
-      {/* Modal cancelamento */}
-      {cancelando && (
+      {/* Modal alterar status */}
+      {editando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCancelando(null)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditando(null)} />
           <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-base font-bold text-gray-900">Cancelar Comissão</h3>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo</label>
-              <textarea
-                value={motivoCanc}
-                onChange={(e) => setMotivoCanc(e.target.value)}
-                rows={3}
-                placeholder="Descreva o motivo do cancelamento..."
-                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
-              />
+            <h3 className="mb-1 text-base font-bold text-gray-900">Alterar Status</h3>
+            <p className="mb-4 text-xs text-gray-400">
+              {editando.vendedor_nome} · {editando.venda_cliente ?? "—"}
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Novo status</label>
+                <select
+                  value={novoStatus}
+                  onChange={(e) => setNovoStatus(e.target.value as StatusComissao)}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
+                >
+                  {TODOS_STATUS.filter((s) => s !== editando.status).map((s) => (
+                    <option key={s} value={s}>{labelStatusComissao(s)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {precisaCompetencia && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Competência</label>
+                  <select
+                    value={compSel}
+                    onChange={(e) => setCompSel(e.target.value)}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
+                  >
+                    <option value="">Selecione...</option>
+                    {competencias.map((c) => (
+                      <option key={c.competencia} value={c.competencia}>{labelCompetencia(c.competencia)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {precisaMotivo && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo do cancelamento</label>
+                  <textarea
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    rows={3}
+                    placeholder="Descreva o motivo..."
+                    className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
+                  />
+                </div>
+              )}
+
+              {erro && (
+                <p className="text-xs text-red-600">{erro}</p>
+              )}
             </div>
-            <div className="mt-4 flex gap-3">
+
+            <div className="mt-5 flex gap-3">
               <button
-                onClick={confirmarCancelamento}
-                disabled={!motivoCanc.trim() || salvandoCanc}
-                className="rounded-2xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                onClick={confirmarAlteracao}
+                disabled={!podeSalvar || salvando}
+                className="rounded-2xl bg-folk px-4 py-2 text-sm font-semibold text-white hover:bg-folk/90 disabled:opacity-50 transition-colors"
               >
-                {salvandoCanc ? "Cancelando..." : "Confirmar"}
+                {salvando ? "Salvando..." : "Confirmar"}
               </button>
               <button
-                onClick={() => setCancelando(null)}
+                onClick={() => setEditando(null)}
                 className="rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                Voltar
+                Cancelar
               </button>
             </div>
           </div>
