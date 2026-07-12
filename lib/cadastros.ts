@@ -10,6 +10,8 @@ export interface Vendedor {
   email: string;
   ativo: boolean;
   google_calendar_id: string | null;
+  tipo: "consultor" | "gerente" | "outro";
+  gerente_id: string | null;
   created_at: string;
 }
 
@@ -63,7 +65,7 @@ export function formatarCPF(v: string): string {
 
 // ── Vendedores ───────────────────────────────────────────────
 
-export type VendedorPayload = Omit<Vendedor, "id" | "user_id" | "created_at" | "google_calendar_id"> & { google_calendar_id?: string | null };
+export type VendedorPayload = Omit<Vendedor, "id" | "user_id" | "created_at" | "google_calendar_id" | "tipo" | "gerente_id"> & { google_calendar_id?: string | null; tipo?: string; gerente_id?: string | null };
 
 export interface FiltrosVendedores { busca?: string; ativo?: boolean | null }
 

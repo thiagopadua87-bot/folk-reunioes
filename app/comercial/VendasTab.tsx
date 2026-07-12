@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listarVendas, criarVenda, editarVenda, excluirVenda, criarObraAPartirDaVenda, marcarPipelineConvertido, registrarOrigemVenda,
-  listarLogsVenda,
+  listarLogsVenda, atualizarGateComissao,
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
   type Venda, type VendaPayload, type VendaLog, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
+import { calcularEInserirComissoes, verificarELiberarComissoes } from "@/lib/comissoes";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -48,6 +49,8 @@ const TIPO_BADGE: Record<TipoVenda, string> = {
 interface FormState {
   data_fechamento: string;
   vendedor_id: string;
+  gerente_id: string;
+  indicador_id: string;
   cnpj: string;
   cliente: string;
   valor_implantacao: string;
@@ -61,6 +64,8 @@ interface FormState {
 const FORM_VAZIO: FormState = {
   data_fechamento: "",
   vendedor_id: "",
+  gerente_id: "",
+  indicador_id: "",
   cnpj: "",
   cliente: "",
   valor_implantacao: "",
@@ -113,6 +118,8 @@ function formDePreenchimento(p: PreenchimentoVenda): FormState {
   return {
     data_fechamento:   new Date().toISOString().slice(0, 10),
     vendedor_id:       p.vendedor_id ?? "",
+    gerente_id:        "",
+    indicador_id:      "",
     cnpj:              "",
     cliente:           p.cliente,
     valor_implantacao: String(p.valor_implantacao || ""),
@@ -147,6 +154,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
   const [arquivo, setArquivo]           = useState<File | null>(null);
   const [logs, setLogs]                 = useState<VendaLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
+  const [togglingGate, setTogglingGate] = useState<string | null>(null);
 
   const reqIdRef = useRef(0);
 
@@ -189,7 +197,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
   function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
-    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
+    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", gerente_id: r.gerente_id ?? "", indicador_id: r.indicador_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
     setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); carregarLogs(r.id);
   }
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); onPreenchimentoUsado?.(); }); }
@@ -220,21 +228,26 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
     setSalvando(true); setErroForm(null);
     try {
       const payload: VendaPayload = {
-        data_fechamento: form.data_fechamento,
-        vendedor_id:     form.vendedor_id || null,
-        cnpj:            form.cnpj.replace(/\D/g, ""),
-        cliente:         form.cliente.trim(),
+        data_fechamento:   form.data_fechamento,
+        vendedor_id:       form.vendedor_id   || null,
+        gerente_id:        form.gerente_id    || null,
+        indicador_id:      form.indicador_id  || null,
+        cnpj:              form.cnpj.replace(/\D/g, ""),
+        cliente:           form.cliente.trim(),
         valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
         valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
-        tipo_venda:      form.tipo_venda,
-        indicado_por:    form.indicado_por.trim(),
-        observacoes:     form.observacoes.trim(),
-        pipeline_id:     preenchimento?.pipeline_id ?? (editando?.pipeline_id ?? null),
+        tipo_venda:        form.tipo_venda,
+        indicado_por:      form.indicado_por.trim(),
+        observacoes:       form.observacoes.trim(),
+        pipeline_id:       preenchimento?.pipeline_id ?? (editando?.pipeline_id ?? null),
+        contrato_assinado: editando?.contrato_assinado ?? false,
+        primeira_nf:       editando?.primeira_nf ?? false,
       };
       if (editando) {
         await editarVenda(editando.id, payload, form.servicos, arquivo, editando, vendedores);
       } else {
         const vendaId = await criarVenda(payload, form.servicos, arquivo);
+        calcularEInserirComissoes(vendaId).catch(() => {});
         if (preenchimento?.pipeline_id) {
           await marcarPipelineConvertido(preenchimento.pipeline_id, vendaId);
           registrarOrigemVenda(vendaId, preenchimento.pipeline_id).catch(() => {});
@@ -252,6 +265,23 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
     try { await excluirVenda(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
     finally { setExcluindo(null); }
+  }
+
+  async function handleToggleGate(venda: Venda, campo: "contrato_assinado" | "primeira_nf") {
+    const chave = `${venda.id}-${campo}`;
+    setTogglingGate(chave);
+    try {
+      const novoValor = !venda[campo];
+      await atualizarGateComissao(venda.id, campo, novoValor);
+      if (novoValor) {
+        verificarELiberarComissoes(venda.id).catch(() => {});
+      }
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao atualizar.");
+    } finally {
+      setTogglingGate(null);
+    }
   }
 
   async function handleEnviarParaProjetos(venda: Venda) {
@@ -328,15 +358,29 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
               <input type="text" value={form.cliente} onChange={(e) => set("cliente", e.target.value)} required placeholder="Nome do cliente" className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Vendedor</label>
+              <label className={LABEL}>Vendedor (Consultor)</label>
               <select value={form.vendedor_id} onChange={(e) => set("vendedor_id", e.target.value)} className={INPUT}>
                 <option value="">Selecione...</option>
+                {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}{v.tipo === "gerente" ? " (Gerente)" : ""}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Gerente responsável</label>
+              <select value={form.gerente_id} onChange={(e) => set("gerente_id", e.target.value)} className={INPUT}>
+                <option value="">Nenhum / derivar do consultor</option>
+                {vendedores.filter((v) => v.tipo === "gerente").map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Indicador (comissão)</label>
+              <select value={form.indicador_id} onChange={(e) => set("indicador_id", e.target.value)} className={INPUT}>
+                <option value="">Nenhum</option>
                 {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Indicado por</label>
-              <input type="text" value={form.indicado_por} onChange={(e) => set("indicado_por", e.target.value)} placeholder="Nome do indicador" className={INPUT} />
+              <label className={LABEL}>Indicado por (texto)</label>
+              <input type="text" value={form.indicado_por} onChange={(e) => set("indicado_por", e.target.value)} placeholder="Nome do indicador (livre)" className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Implantação (R$)</label>
@@ -571,6 +615,26 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
                         >
                           {enviando === r.id ? "..." : "→ Projetos"}
                         </button>
+                      )}
+                      {canEdit && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => handleToggleGate(r, "contrato_assinado")}
+                            disabled={togglingGate === `${r.id}-contrato_assinado`}
+                            title="Contrato assinado"
+                            className={`flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 ${r.contrato_assinado ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+                          >
+                            {r.contrato_assinado ? "✓" : "○"} Contrato
+                          </button>
+                          <button
+                            onClick={() => handleToggleGate(r, "primeira_nf")}
+                            disabled={togglingGate === `${r.id}-primeira_nf`}
+                            title="Primeira NF emitida"
+                            className={`flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 ${r.primeira_nf ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+                          >
+                            {r.primeira_nf ? "✓" : "○"} 1ª NF
+                          </button>
+                        </div>
                       )}
                       {r.arquivo_url && (
                         <a href={r.arquivo_url} target="_blank" rel="noreferrer"

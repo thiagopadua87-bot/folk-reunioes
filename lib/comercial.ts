@@ -102,6 +102,8 @@ export interface Venda {
   data_fechamento: string;
   vendedor_id: string | null;
   vendedor_nome: string | null;
+  gerente_id: string | null;
+  indicador_id: string | null;
   cnpj: string;
   cliente: string;
   valor_implantacao: number;
@@ -113,6 +115,8 @@ export interface Venda {
   arquivo_url: string | null;
   arquivo_nome: string | null;
   enviado_para_projetos: boolean;
+  contrato_assinado: boolean;
+  primeira_nf: boolean;
   pipeline_id: string | null;
   created_at: string;
 }
@@ -198,6 +202,18 @@ export function formatData(s: string) {
 // ── Vendas ───────────────────────────────────────────────────
 
 export type VendaPayload = Omit<Venda, "id" | "user_id" | "created_at" | "servicos" | "vendedor_nome" | "arquivo_url" | "arquivo_nome" | "enviado_para_projetos">;
+
+export async function atualizarGateComissao(
+  vendaId: string,
+  campo: "contrato_assinado" | "primeira_nf",
+  valor: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("vendas")
+    .update({ [campo]: valor })
+    .eq("id", vendaId);
+  if (error) throw new Error(error.message);
+}
 
 export interface FiltrosVendas {
   dataInicio?: string;

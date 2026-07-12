@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import VendasTab from "./VendasTab";
 import PipelineTab from "./PipelineTab";
 import DashboardCRMTab from "./DashboardCRMTab";
+import ComissoesTab from "./ComissoesTab";
 import type { PreenchimentoVenda, PipelineItem } from "@/lib/comercial";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { usePermissions, AccessDenied } from "@/app/components/PermissionsProvider";
@@ -101,14 +102,7 @@ function ComercialPageContent() {
             />
           )}
           {aba === "dashboard" && <DashboardCRMTab />}
-          {aba === "comissoes" && (
-            <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white">
-              <div className="text-center">
-                <p className="text-sm font-semibold text-gray-400">Painel de Comissões</p>
-                <p className="mt-1 text-xs text-gray-300">Em breve</p>
-              </div>
-            </div>
-          )}
+          {aba === "comissoes" && <ComissoesTab />}
         </>
       )}
     </main>

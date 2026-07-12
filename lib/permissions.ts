@@ -8,6 +8,10 @@ export type ScreenKey =
   | "comercial.vendas"
   | "comercial.dashboard"
   | "comercial.comissoes"
+  | "comercial.comissoes.dashboard"
+  | "comercial.comissoes.regras"
+  | "comercial.comissoes.competencias"
+  | "comercial.comissoes.relatorios"
   | "obras.andamento"
   | "obras.concluidas"
   | "obras.dashboard"
@@ -49,7 +53,11 @@ export const SCREENS: ScreenDef[] = [
   { key: "comercial.pipeline",        label: "Pipeline",         group: "Comercial", hasEdit: true,  hasDelete: true  },
   { key: "comercial.vendas",          label: "Vendas",           group: "Comercial", hasEdit: true,  hasDelete: true  },
   { key: "comercial.dashboard",       label: "Dashboard",        group: "Comercial", hasEdit: false, hasDelete: false },
-  { key: "comercial.comissoes",       label: "Comissões",        group: "Comercial", hasEdit: false, hasDelete: false },
+  { key: "comercial.comissoes",              label: "Comissões",        group: "Comercial", hasEdit: false, hasDelete: false },
+  { key: "comercial.comissoes.dashboard",   label: "Dashboard",        group: "Comissões", hasEdit: false, hasDelete: false },
+  { key: "comercial.comissoes.regras",      label: "Regras",           group: "Comissões", hasEdit: true,  hasDelete: false },
+  { key: "comercial.comissoes.competencias", label: "Competências",    group: "Comissões", hasEdit: true,  hasDelete: false },
+  { key: "comercial.comissoes.relatorios",  label: "Relatórios",       group: "Comissões", hasEdit: false, hasDelete: false },
   { key: "obras.andamento",           label: "Em andamento",     group: "Obras",     hasEdit: true,  hasDelete: true  },
   { key: "obras.concluidas",          label: "Concluídas",       group: "Obras",     hasEdit: true,  hasDelete: true  },
   { key: "obras.dashboard",           label: "Dashboard",        group: "Obras",     hasEdit: false, hasDelete: false },
