@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   listarComissoesHistorico, listarCompetencias, alterarStatusComissao,
   type Comissao, type StatusComissao, type Competencia,
@@ -26,6 +26,16 @@ const BADGE_TIPO: Record<string, string> = {
   indicador: "bg-amber-100 text-amber-700",
 };
 
+function gerarCompetenciasRecentes(n = 12): string[] {
+  const hoje = new Date();
+  const result: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return result;
+}
+
 const TODOS_STATUS: StatusComissao[] = [
   "aguardando_liberacao", "elegivel", "na_competencia", "aprovada", "paga", "cancelada",
 ];
@@ -48,6 +58,12 @@ export default function HistoricoComissoes() {
   const [motivo,       setMotivo]       = useState("");
   const [salvando,     setSalvando]     = useState(false);
   const [erro,         setErro]         = useState<string | null>(null);
+
+  const opcoesCompetencia = useMemo(() => {
+    const dbSet   = new Set(competencias.map((c) => c.competencia));
+    const geradas = gerarCompetenciasRecentes(12).filter((c) => !dbSet.has(c));
+    return [...competencias.map((c) => c.competencia), ...geradas].sort((a, b) => b.localeCompare(a));
+  }, [competencias]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -251,8 +267,8 @@ export default function HistoricoComissoes() {
                     className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-folk focus:ring-2 focus:ring-folk/10"
                   >
                     <option value="">Selecione...</option>
-                    {competencias.map((c) => (
-                      <option key={c.competencia} value={c.competencia}>{labelCompetencia(c.competencia)}</option>
+                    {opcoesCompetencia.map((comp) => (
+                      <option key={comp} value={comp}>{labelCompetencia(comp)}</option>
                     ))}
                   </select>
                 </div>
