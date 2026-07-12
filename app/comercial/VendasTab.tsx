@@ -7,7 +7,7 @@ import {
   TIPOS_VENDA, SERVICOS_COMERCIAL, labelTipoVenda, formatMoeda, formatData,
   type Venda, type VendaPayload, type VendaLog, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
-import { calcularEInserirComissoes, verificarELiberarComissoes } from "@/lib/comissoes";
+import { calcularEInserirComissoes, verificarELiberarComissoes, recalcularComissoesDaVenda } from "@/lib/comissoes";
 import { listarVendedores, type Vendedor } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -154,7 +154,9 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
   const [arquivo, setArquivo]           = useState<File | null>(null);
   const [logs, setLogs]                 = useState<VendaLog[]>([]);
   const [carregandoLogs, setCarregandoLogs] = useState(false);
-  const [togglingGate, setTogglingGate] = useState<string | null>(null);
+  const [togglingGate, setTogglingGate]         = useState<string | null>(null);
+  const [calculandoComissao, setCalculandoComissao] = useState<string | null>(null);
+  const [feedbackComissao, setFeedbackComissao]     = useState<{ id: string; ok: boolean } | null>(null);
 
   const reqIdRef = useRef(0);
 
@@ -265,6 +267,21 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
     try { await excluirVenda(id); await carregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Erro ao excluir."); }
     finally { setExcluindo(null); }
+  }
+
+  async function handleCalcularComissao(venda: Venda) {
+    setCalculandoComissao(venda.id);
+    setFeedbackComissao(null);
+    try {
+      await recalcularComissoesDaVenda(venda.id);
+      setFeedbackComissao({ id: venda.id, ok: true });
+      setTimeout(() => setFeedbackComissao(null), 3000);
+    } catch {
+      setFeedbackComissao({ id: venda.id, ok: false });
+      setTimeout(() => setFeedbackComissao(null), 3000);
+    } finally {
+      setCalculandoComissao(null);
+    }
   }
 
   async function handleToggleGate(venda: Venda, campo: "contrato_assinado" | "primeira_nf") {
@@ -650,6 +667,26 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
                     <div className="flex items-center gap-1 flex-wrap">
                       <button onClick={() => setVisualizando(r)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700">Ver</button>
                       {canEdit   && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-folk/20 px-2 py-1 text-xs font-semibold text-folk transition-colors hover:border-folk/50 hover:bg-folk/5">Editar</button>}
+                      {canEdit && (
+                        <button
+                          onClick={() => handleCalcularComissao(r)}
+                          disabled={calculandoComissao === r.id}
+                          title="Calcular / recalcular comissões desta venda"
+                          className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                            feedbackComissao?.id === r.id
+                              ? feedbackComissao.ok
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-red-200 bg-red-50 text-red-600"
+                              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                          }`}
+                        >
+                          {calculandoComissao === r.id
+                            ? "..."
+                            : feedbackComissao?.id === r.id
+                              ? feedbackComissao.ok ? "✓ Comissão" : "✗ Erro"
+                              : "Comissão"}
+                        </button>
+                      )}
                       {canDelete && <button onClick={() => handleExcluir(r.id)} disabled={excluindo === r.id} className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50">{excluindo === r.id ? "..." : "Excluir"}</button>}
                     </div>
                   </td>
