@@ -1,5 +1,5 @@
 -- ============================================================
--- MÓDULO DE COMISSÕES — MIGRATION COMPLETA
+-- MÓDULO DE COMISSÕES — MIGRATION COMPLETA (idempotente)
 -- ============================================================
 
 -- 1. Novos campos em vendedores
@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS public.comissoes_regras (
 );
 
 ALTER TABLE public.comissoes_regras ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "auth_read_comissoes_regras"    ON public.comissoes_regras;
+DROP POLICY IF EXISTS "admin_manage_comissoes_regras" ON public.comissoes_regras;
 
 CREATE POLICY "auth_read_comissoes_regras" ON public.comissoes_regras
   FOR SELECT USING (auth.uid() IS NOT NULL);
@@ -78,7 +81,15 @@ CREATE TABLE IF NOT EXISTS public.competencias_comissao (
   updated_at            timestamptz NOT NULL DEFAULT now()
 );
 
+-- Adicionar colunas ano/mes se a tabela já existia sem elas
+ALTER TABLE public.competencias_comissao
+  ADD COLUMN IF NOT EXISTS ano integer,
+  ADD COLUMN IF NOT EXISTS mes integer;
+
 ALTER TABLE public.competencias_comissao ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "auth_read_competencias"    ON public.competencias_comissao;
+DROP POLICY IF EXISTS "admin_manage_competencias" ON public.competencias_comissao;
 
 CREATE POLICY "auth_read_competencias" ON public.competencias_comissao
   FOR SELECT USING (auth.uid() IS NOT NULL);
@@ -122,6 +133,9 @@ CREATE TABLE IF NOT EXISTS public.comissoes (
 
 ALTER TABLE public.comissoes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "auth_read_comissoes"    ON public.comissoes;
+DROP POLICY IF EXISTS "admin_manage_comissoes" ON public.comissoes;
+
 CREATE POLICY "auth_read_comissoes" ON public.comissoes
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
@@ -143,6 +157,9 @@ CREATE TABLE IF NOT EXISTS public.comissoes_audit (
 );
 
 ALTER TABLE public.comissoes_audit ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "admin_read_comissoes_audit"  ON public.comissoes_audit;
+DROP POLICY IF EXISTS "auth_insert_comissoes_audit" ON public.comissoes_audit;
 
 CREATE POLICY "admin_read_comissoes_audit" ON public.comissoes_audit
   FOR SELECT
