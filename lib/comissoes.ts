@@ -66,6 +66,8 @@ export interface ComissaoRegra {
 export interface Competencia {
   id:                    string;
   competencia:           string;
+  ano:                   number;
+  mes:                   number;
   data_inicio:           string;
   data_fim:              string;
   status:                StatusCompetencia;
@@ -339,10 +341,12 @@ export async function buscarOuCriarCompetencia(competenciaStr: string): Promise<
   const { competencia, data_inicio, data_fim } = calcularCompetencia(
     competenciaStr.slice(0, 4) + "-" + competenciaStr.slice(5, 7) + "-15"
   );
+  const ano = parseInt(competencia.slice(0, 4));
+  const mes = parseInt(competencia.slice(5, 7));
 
   const { data, error } = await supabase
     .from("competencias_comissao")
-    .insert({ competencia, data_inicio, data_fim })
+    .insert({ competencia, ano, mes, data_inicio, data_fim })
     .select()
     .single();
 

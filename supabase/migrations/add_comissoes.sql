@@ -58,6 +58,8 @@ ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.competencias_comissao (
   id                    uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   competencia           text        NOT NULL UNIQUE,
+  ano                   integer     NOT NULL,
+  mes                   integer     NOT NULL CHECK (mes BETWEEN 1 AND 12),
   data_inicio           date        NOT NULL,
   data_fim              date        NOT NULL,
   status                text        NOT NULL DEFAULT 'aberta'
@@ -154,3 +156,5 @@ CREATE INDEX IF NOT EXISTS comissoes_venda_id_idx       ON public.comissoes(vend
 CREATE INDEX IF NOT EXISTS comissoes_vendedor_id_idx    ON public.comissoes(vendedor_id);
 CREATE INDEX IF NOT EXISTS comissoes_competencia_idx    ON public.comissoes(competencia);
 CREATE INDEX IF NOT EXISTS comissoes_status_idx         ON public.comissoes(status);
+CREATE INDEX IF NOT EXISTS competencias_ano_mes_idx     ON public.competencias_comissao(ano, mes);
+CREATE INDEX IF NOT EXISTS competencias_ano_idx         ON public.competencias_comissao(ano);
