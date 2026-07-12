@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import ClientesPerdidos from "./ClientesPerdidos";
 import GestaoCrise from "./GestaoCrise";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -8,41 +9,43 @@ import { useUnsavedChanges } from "@/lib/unsaved-changes";
 type Aba = "clientes-perdidos" | "gestao-crise";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
-  { value: "clientes-perdidos", label: "Clientes Perdidos",  descricao: "Registros de contratos encerrados e análise de causas" },
-  { value: "gestao-crise",      label: "Gestão de Crise",    descricao: "Monitoramento de clientes em risco de cancelamento" },
+  { value: "clientes-perdidos", label: "Clientes Perdidos", descricao: "Registros de contratos encerrados e análise de causas" },
+  { value: "gestao-crise",      label: "Gestão de Crise",   descricao: "Monitoramento de clientes em risco de cancelamento" },
 ];
 
-export default function OperacionalPage() {
-  const [aba, setAba]                         = useState<Aba>("clientes-perdidos");
-  const [focoRegistroId, setFocoRegistroId]   = useState<string | null>(null);
-  const abaAtual = ABAS.find((a) => a.value === aba)!;
-  const { guardCancel } = useUnsavedChanges();
+function OperacionalContent() {
+  const searchParams              = useSearchParams();
+  const router                    = useRouter();
+  const { guardCancel }           = useUnsavedChanges();
+  const [focoRegistroId, setFocoRegistroId] = useState<string | null>(null);
 
-  function trocarAba(nova: Aba) { guardCancel(() => setAba(nova)); }
+  const abaParam = searchParams.get("aba") as Aba | null;
+  const aba: Aba = abaParam ?? "clientes-perdidos";
+  const abaAtual = ABAS.find((a) => a.value === aba) ?? ABAS[0];
+
+  function trocarAba(nova: Aba) {
+    guardCancel(() => router.replace(`/operacional?aba=${nova}`));
+  }
 
   function navegarParaClientePerdido(id: string) {
     setFocoRegistroId(id);
-    setAba("clientes-perdidos");
+    router.replace("/operacional?aba=clientes-perdidos");
   }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      {/* Cabeçalho */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Operacional</h1>
         <p className="mt-1 text-sm text-gray-500">{abaAtual.descricao}</p>
       </div>
 
-      {/* Seletor de abas */}
       <div className="mb-8 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
         {ABAS.map(({ value, label }) => (
           <button
             key={value}
             onClick={() => trocarAba(value)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition-colors ${
-              aba === value
-                ? "bg-folk text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
+              aba === value ? "bg-folk text-white shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}
           >
             {label}
@@ -50,7 +53,6 @@ export default function OperacionalPage() {
         ))}
       </div>
 
-      {/* Conteúdo da aba */}
       {aba === "clientes-perdidos" && (
         <ClientesPerdidos
           focoRegistroId={focoRegistroId}
@@ -61,5 +63,13 @@ export default function OperacionalPage() {
         <GestaoCrise onNavigarParaClientePerdido={navegarParaClientePerdido} />
       )}
     </main>
+  );
+}
+
+export default function OperacionalPage() {
+  return (
+    <Suspense fallback={null}>
+      <OperacionalContent />
+    </Suspense>
   );
 }

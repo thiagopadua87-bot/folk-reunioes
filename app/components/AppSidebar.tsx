@@ -81,6 +81,14 @@ function IconUsers() {
   );
 }
 
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
 function IconMenu() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -100,6 +108,18 @@ function IconX() {
   );
 }
 
+function IconChevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round"
+      className={`h-3 w-3 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 // ── Estrutura de navegação ────────────────────────────────────
 
 type SubItem = {
@@ -113,19 +133,20 @@ type SubItem = {
 type NavEntry =
   | { type: "link"; label: string; href: string; icon: React.ReactNode }
   | {
-      type: "group";
-      label: string;
-      icon: React.ReactNode;
-      basePath: string;
+      type:       "group";
+      key:        string;
+      label:      string;
+      icon:       React.ReactNode;
+      basePath:   string;
       defaultAba: string;
-      items: SubItem[];
+      items:      SubItem[];
     };
 
 const NAV: NavEntry[] = [
-  { type: "link", label: "Início",   href: "/",        icon: <IconHome /> },
-  { type: "link", label: "Reuniões", href: "/reuniao",  icon: <IconCalendar /> },
+  { type: "link", label: "Início",   href: "/",       icon: <IconHome /> },
+  { type: "link", label: "Reuniões", href: "/reuniao", icon: <IconCalendar /> },
   {
-    type: "group", label: "Comercial", icon: <IconBriefcase />,
+    type: "group", key: "comercial", label: "Comercial", icon: <IconBriefcase />,
     basePath: "/comercial", defaultAba: "pipeline",
     items: [
       { label: "Pipeline",  aba: "pipeline",  screenKey: "comercial.pipeline" },
@@ -135,7 +156,7 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    type: "group", label: "Obras", icon: <IconHardHat />,
+    type: "group", key: "obras", label: "Obras", icon: <IconHardHat />,
     basePath: "/obras", defaultAba: "andamento",
     items: [
       { label: "Em andamento", aba: "andamento",  screenKey: "obras.andamento" },
@@ -144,7 +165,7 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    type: "group", label: "Projetos", icon: <IconLayers />,
+    type: "group", key: "projetos", label: "Projetos", icon: <IconLayers />,
     basePath: "/projetos", defaultAba: "andamento",
     items: [
       { label: "Em andamento", aba: "andamento",  screenKey: "projetos.andamento" },
@@ -153,7 +174,7 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    type: "group", label: "Cobrança", icon: <IconCreditCard />,
+    type: "group", key: "cobranca", label: "Cobrança", icon: <IconCreditCard />,
     basePath: "/inadimplencia", defaultAba: "faturas",
     items: [
       { label: "Clientes",      aba: "faturas",       screenKey: "cobranca.clientes" },
@@ -162,21 +183,42 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    type: "group", label: "Cadastros", icon: <IconUsers />,
+    type: "group", key: "operacional", label: "Operacional", icon: <IconShield />,
+    basePath: "/operacional", defaultAba: "clientes-perdidos",
+    items: [
+      { label: "Clientes Perdidos", aba: "clientes-perdidos" },
+      { label: "Gestão de Crise",   aba: "gestao-crise" },
+    ],
+  },
+  {
+    type: "group", key: "cadastros", label: "Cadastros", icon: <IconUsers />,
     basePath: "/cadastros", defaultAba: "vendedores",
     items: [
-      { label: "Usuários",          href: "/admin",                                adminOnly: true },
-      { label: "Vendedores",        aba: "vendedores",      screenKey: "cadastros.vendedores" },
-      { label: "Técnicos",          aba: "tecnicos",        screenKey: "cadastros.tecnicos" },
-      { label: "Terceirizados",     aba: "terceirizados",   screenKey: "cadastros.terceirizados" },
-      { label: "Concorrentes",      aba: "concorrentes",    screenKey: "cadastros.concorrentes" },
-      { label: "Motivos de Perda",  aba: "motivos_perda",   screenKey: "cadastros.motivos_perda" },
+      { label: "Usuários",          href: "/admin",                                   adminOnly: true },
+      { label: "Vendedores",        aba: "vendedores",        screenKey: "cadastros.vendedores" },
+      { label: "Técnicos",          aba: "tecnicos",          screenKey: "cadastros.tecnicos" },
+      { label: "Terceirizados",     aba: "terceirizados",     screenKey: "cadastros.terceirizados" },
+      { label: "Concorrentes",      aba: "concorrentes",      screenKey: "cadastros.concorrentes" },
+      { label: "Motivos de Perda",  aba: "motivos_perda",     screenKey: "cadastros.motivos_perda" },
       { label: "Síndicos/Gestores", aba: "sindicos_gestores", screenKey: "cadastros.sindicos_gestores" },
     ],
   },
 ];
 
-// ── Links de navegação (usa useSearchParams → precisa de Suspense) ──
+// ── Chave de persistência no localStorage ─────────────────────
+const LS_KEY = "folk_sidebar_collapsed";
+
+function getInitialCollapsed(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+// ── Links de navegação ────────────────────────────────────────
 
 function NavLinks({ isAdmin, onClose }: { isAdmin: boolean; onClose?: () => void }) {
   const pathname     = usePathname();
@@ -185,13 +227,27 @@ function NavLinks({ isAdmin, onClose }: { isAdmin: boolean; onClose?: () => void
   const { isDirty, guardNavigate } = useUnsavedChanges();
   const { perm } = usePermissions();
 
+  const [collapsed, setCollapsed] = useState<Set<string>>(getInitialCollapsed);
+
+  function toggleGroup(key: string, isActive: boolean) {
+    // Grupo ativo não colapsa (UX: sempre vê onde está)
+    if (isActive) return;
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try { localStorage.setItem(LS_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
   function handleNav(href: string, e: React.MouseEvent) {
     if (isDirty) { e.preventDefault(); guardNavigate(href); }
     onClose?.();
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {NAV.map((entry) => {
         if (entry.type === "link") {
           const active = pathname === entry.href;
@@ -224,46 +280,55 @@ function NavLinks({ isAdmin, onClose }: { isAdmin: boolean; onClose?: () => void
           pathname.startsWith(entry.basePath + "/") ||
           visibleItems.some((s) => s.href && (pathname === s.href || pathname.startsWith(s.href + "/")));
 
+        const isOpen     = groupActive || !collapsed.has(entry.key);
         const effectiveAba = abaParam ?? entry.defaultAba;
 
         return (
-          <div key={entry.basePath}>
-            <div
-              className={`flex items-center gap-2.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${
-                groupActive ? "text-folk" : "text-gray-400"
+          <div key={entry.key}>
+            {/* Cabeçalho do grupo — clicável para colapsar */}
+            <button
+              type="button"
+              onClick={() => toggleGroup(entry.key, groupActive)}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-1.5 text-left transition-colors ${
+                groupActive
+                  ? "text-folk"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               }`}
             >
-              {entry.icon}
-              {entry.label}
-            </div>
-            <div className="ml-2 space-y-0.5">
-              {visibleItems.map((sub) => {
-                const navHref = sub.href ?? `${entry.basePath}?aba=${sub.aba}`;
-                const subActive = sub.href
-                  ? pathname === sub.href || pathname.startsWith(sub.href + "/")
-                  : groupActive && effectiveAba === sub.aba;
+              <span className={groupActive ? "text-folk" : "text-gray-400"}>{entry.icon}</span>
+              <span className={`flex-1 text-[11px] font-bold uppercase tracking-wider`}>
+                {entry.label}
+              </span>
+              <IconChevron open={isOpen} />
+            </button>
 
-                return (
-                  <Link
-                    key={sub.href ?? sub.aba}
-                    href={navHref}
-                    onClick={(e) => handleNav(navHref, e)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors ${
-                      subActive
-                        ? "bg-folk/10 font-semibold text-folk"
-                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        subActive ? "bg-folk" : "bg-gray-300"
+            {/* Sub-itens colapsáveis */}
+            {isOpen && (
+              <div className="ml-2 mt-0.5 mb-1 space-y-0.5">
+                {visibleItems.map((sub) => {
+                  const navHref = sub.href ?? `${entry.basePath}?aba=${sub.aba}`;
+                  const subActive = sub.href
+                    ? pathname === sub.href || pathname.startsWith(sub.href + "/")
+                    : groupActive && effectiveAba === sub.aba;
+
+                  return (
+                    <Link
+                      key={sub.href ?? sub.aba}
+                      href={navHref}
+                      onClick={(e) => handleNav(navHref, e)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors ${
+                        subActive
+                          ? "bg-folk/10 font-semibold text-folk"
+                          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                       }`}
-                    />
-                    {sub.label}
-                  </Link>
-                );
-              })}
-            </div>
+                    >
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${subActive ? "bg-folk" : "bg-gray-300"}`} />
+                      {sub.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
