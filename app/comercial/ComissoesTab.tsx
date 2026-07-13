@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePermissions } from "@/app/components/PermissionsProvider";
 import {
   listarRegras, listarCompetencias, buscarResumoDashboard,
@@ -25,49 +25,79 @@ const SUB_ABAS: { value: SubAba; label: string }[] = [
 export default function ComissoesTab() {
   const { isAdmin } = usePermissions();
   const [subAba, setSubAba] = useState<SubAba>("dashboard");
-  const [regras, setRegras] = useState<ComissaoRegra[]>([]);
-  const [competencias, setCompetencias] = useState<Competencia[]>([]);
-  const [dashboard, setDashboard] = useState<ResumoDashboard | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [, startTransition] = useTransition();
+
+  // dados por aba — carregados só quando necessário
+  const [regras,        setRegras]        = useState<ComissaoRegra[]>([]);
+  const [competencias,  setCompetencias]  = useState<Competencia[]>([]);
+  const [dashboard,     setDashboard]     = useState<ResumoDashboard | null>(null);
+
+  // controle de quais abas já foram carregadas (evita re-fetch ao voltar)
+  const carregadas = useRef<Set<SubAba>>(new Set());
+  const [carregandoAba, setCarregandoAba] = useState(false);
 
   const subAbas = isAdmin ? SUB_ABAS : SUB_ABAS.filter((s) => s.value !== "regras");
 
-  async function carregar() {
-    setCarregando(true);
-    try {
-      const [r, c, d] = await Promise.all([
-        listarRegras(),
-        listarCompetencias(),
-        buscarResumoDashboard(),
-      ]);
-      setRegras(r);
-      setCompetencias(c);
-      setDashboard(d);
-    } catch {
-      // silencioso; componentes filhos lidam com erro individualmente
-    } finally {
-      setCarregando(false);
+  useEffect(() => {
+    if (carregadas.current.has(subAba)) return;
+
+    async function carregar() {
+      setCarregandoAba(true);
+      try {
+        if (subAba === "dashboard") {
+          const [d, c] = await Promise.all([buscarResumoDashboard(), listarCompetencias()]);
+          setDashboard(d);
+          setCompetencias(c);
+          carregadas.current.add("competencias"); // competências compartilhadas
+        } else if (subAba === "competencias") {
+          if (!carregadas.current.has("dashboard")) {
+            const c = await listarCompetencias();
+            setCompetencias(c);
+          }
+        } else if (subAba === "regras") {
+          const r = await listarRegras();
+          setRegras(r);
+        }
+        carregadas.current.add(subAba);
+      } catch {
+        // componentes filhos mostram seus próprios erros
+      } finally {
+        setCarregandoAba(false);
+      }
     }
-  }
 
-  useEffect(() => { carregar(); }, []);
+    carregar();
+  }, [subAba]);
 
-  function recarregar() {
-    startTransition(() => { carregar(); });
-  }
+  async function recarregarAbaAtual() {
+    carregadas.current.delete(subAba);
+    // remove competências do cache também quando for dashboard
+    if (subAba === "dashboard") carregadas.current.delete("competencias");
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center py-20 text-sm text-gray-400">
-        Carregando comissões...
-      </div>
-    );
+    setCarregandoAba(true);
+    try {
+      if (subAba === "dashboard") {
+        const [d, c] = await Promise.all([buscarResumoDashboard(), listarCompetencias()]);
+        setDashboard(d);
+        setCompetencias(c);
+        carregadas.current.add("competencias");
+      } else if (subAba === "competencias") {
+        const c = await listarCompetencias();
+        setCompetencias(c);
+      } else if (subAba === "regras") {
+        const r = await listarRegras();
+        setRegras(r);
+      }
+      carregadas.current.add(subAba);
+    } catch {
+      // silencioso
+    } finally {
+      setCarregandoAba(false);
+    }
   }
 
   return (
     <div>
-      {/* Sub-navegação */}
+      {/* Sub-navegação — sempre visível, sem spinner global */}
       <div className="mb-6 flex gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm w-fit">
         {subAbas.map(({ value, label }) => (
           <button
@@ -84,7 +114,11 @@ export default function ComissoesTab() {
         ))}
       </div>
 
-      {subAba === "dashboard" && dashboard && (
+      {carregandoAba && (
+        <p className="text-sm text-gray-400">Carregando...</p>
+      )}
+
+      {!carregandoAba && subAba === "dashboard" && dashboard && (
         <ComissoesDashboard
           dashboard={dashboard}
           competencias={competencias}
@@ -92,10 +126,10 @@ export default function ComissoesTab() {
         />
       )}
 
-      {subAba === "competencias" && (
+      {!carregandoAba && subAba === "competencias" && (
         <CompetenciasTable
           competencias={competencias}
-          onRecarregar={recarregar}
+          onRecarregar={recarregarAbaAtual}
         />
       )}
 
@@ -107,10 +141,10 @@ export default function ComissoesTab() {
         <RelatorioComissoes />
       )}
 
-      {subAba === "regras" && isAdmin && (
+      {!carregandoAba && subAba === "regras" && isAdmin && (
         <ConfiguracaoRegras
           regras={regras}
-          onRecarregar={recarregar}
+          onRecarregar={recarregarAbaAtual}
         />
       )}
     </div>

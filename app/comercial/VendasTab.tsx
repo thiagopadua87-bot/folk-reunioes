@@ -158,20 +158,25 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
 
   const reqIdRef = useRef(0);
 
+  // Carrega vendedores e indicadores uma vez só (não dependem de filtros ou paginação)
+  useEffect(() => {
+    Promise.all([
+      listarVendedores({ ativo: true }),
+      listarIndicadores({ ativo: true }),
+    ]).then(([vends, inds]) => {
+      setVendedores(vends);
+      setIndicadores(inds);
+    }).catch(() => {});
+  }, []);
+
   const carregar = useCallback(async () => {
     const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
-      const [pagina_dados, vends, inds] = await Promise.all([
-        listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, vendedorId: filtros.vendedorId || undefined, pagina, porPagina }),
-        listarVendedores({ ativo: true }),
-        listarIndicadores({ ativo: true }),
-      ]);
+      const pagina_dados = await listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, vendedorId: filtros.vendedorId || undefined, pagina, porPagina });
       if (reqId !== reqIdRef.current) return;
       setRegistros(pagina_dados.registros);
       setTotal(pagina_dados.total);
-      setVendedores(vends);
-      setIndicadores(inds);
     } catch (e) {
       if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");

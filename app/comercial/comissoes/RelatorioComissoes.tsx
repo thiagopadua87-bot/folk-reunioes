@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   listarComissoesHistorico, listarCompetencias,
   type Comissao, type StatusComissao,
@@ -347,10 +347,11 @@ function KPI({ label, value, destaque }: { label: string; value: string; destaqu
   );
 }
 
-// Carrega vendedores silenciosamente para popular o filtro antes do primeiro "Gerar"
 function LoadVendedores({ onLoad }: { onLoad: (v: Vendedor[]) => void }) {
-  useState(() => {
+  useEffect(() => {
     listarVendedores({ ativo: undefined }).then(onLoad).catch(() => {});
-  });
+  // onLoad é estável (setState) — sem dependência para não re-executar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return null;
 }

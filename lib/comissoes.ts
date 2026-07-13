@@ -317,7 +317,8 @@ export async function listarCompetencias(): Promise<Competencia[]> {
     .from("comissoes")
     .select("competencia, comissao_total, venda_id, vendedor_id")
     .in("competencia", comps.map((c) => c.competencia))
-    .neq("status", "cancelada");
+    .neq("status", "cancelada")
+    .limit(2000);
 
   for (const comp of comps) {
     const linhas = (totais ?? []).filter((r: { competencia: string | null }) => r.competencia === comp.competencia);
