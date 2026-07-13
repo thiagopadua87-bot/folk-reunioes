@@ -11,25 +11,38 @@ import { useUnsavedChanges } from "@/lib/unsaved-changes";
 const INPUT = "rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-folk focus:ring-2 focus:ring-folk/10 w-full";
 const LABEL = "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
+const BADGE_TIPO: Record<string, string> = {
+  consultor: "bg-folk/10 text-folk border-folk/20",
+  gerente:   "bg-blue-50 text-blue-700 border-blue-200",
+  outro:     "bg-gray-100 text-gray-500 border-gray-200",
+};
+const LABEL_TIPO: Record<string, string> = {
+  consultor: "Consultor",
+  gerente:   "Gerente",
+  outro:     "Outro",
+};
+
 interface FormState {
-  nome: string;
-  telefone: string;
-  email: string;
-  ativo: boolean;
+  nome:       string;
+  telefone:   string;
+  email:      string;
+  ativo:      boolean;
+  tipo:       string;
+  gerente_id: string;
 }
 
-const FORM_VAZIO: FormState = { nome: "", telefone: "", email: "", ativo: true };
+const FORM_VAZIO: FormState = { nome: "", telefone: "", email: "", ativo: true, tipo: "consultor", gerente_id: "" };
 
 export default function VendedoresTab({ canEdit = true }: { canEdit?: boolean }) {
-  const [registros, setRegistros] = useState<Vendedor[]>([]);
+  const [registros,  setRegistros]  = useState<Vendedor[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
-  const [view, setView] = useState<"list" | "form">("list");
-  const [editando, setEditando] = useState<Vendedor | null>(null);
-  const [form, setForm] = useState<FormState>(FORM_VAZIO);
-  const [salvando, setSalvando] = useState(false);
-  const [erroForm, setErroForm] = useState<string | null>(null);
-  const [filtros, setFiltros] = useState<FiltrosVendedores>({ busca: "", ativo: null });
+  const [erro,       setErro]       = useState<string | null>(null);
+  const [view,       setView]       = useState<"list" | "form">("list");
+  const [editando,   setEditando]   = useState<Vendedor | null>(null);
+  const [form,       setForm]       = useState<FormState>(FORM_VAZIO);
+  const [salvando,   setSalvando]   = useState(false);
+  const [erroForm,   setErroForm]   = useState<string | null>(null);
+  const [filtros,    setFiltros]    = useState<FiltrosVendedores>({ busca: "", ativo: null });
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
@@ -44,21 +57,38 @@ export default function VendedoresTab({ canEdit = true }: { canEdit?: boolean })
 
   const { markDirty, markClean, guardCancel } = useUnsavedChanges();
 
+  const gerentes = registros.filter((v) => v.tipo === "gerente");
+
   function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); markClean(); setView("form"); }
   function abrirEditar(r: Vendedor) {
     setEditando(r);
-    setForm({ nome: r.nome, telefone: r.telefone, email: r.email, ativo: r.ativo });
+    setForm({ nome: r.nome, telefone: r.telefone, email: r.email, ativo: r.ativo, tipo: r.tipo ?? "consultor", gerente_id: r.gerente_id ?? "" });
     setErroForm(null); markClean(); setView("form");
   }
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); }); }
-  function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm((p) => ({ ...p, [k]: v })); markDirty(); }
+  function set<K extends keyof FormState>(k: K, v: FormState[K]) {
+    setForm((p) => {
+      const next = { ...p, [k]: v };
+      // limpa gerente se tipo mudou para não-consultor
+      if (k === "tipo" && v !== "consultor") next.gerente_id = "";
+      return next;
+    });
+    markDirty();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.nome.trim()) { setErroForm("Nome é obrigatório."); return; }
     setSalvando(true); setErroForm(null);
     try {
-      const payload: VendedorPayload = { nome: form.nome.trim(), telefone: form.telefone.trim(), email: form.email.trim(), ativo: form.ativo };
+      const payload: VendedorPayload = {
+        nome:       form.nome.trim(),
+        telefone:   form.telefone.trim(),
+        email:      form.email.trim(),
+        ativo:      form.ativo,
+        tipo:       form.tipo,
+        gerente_id: form.tipo === "consultor" && form.gerente_id ? form.gerente_id : null,
+      };
       if (editando) await editarVendedor(editando.id, payload);
       else           await criarVendedor(payload);
       markClean(); setView("list"); setEditando(null); await carregar();
@@ -97,10 +127,36 @@ export default function VendedoresTab({ canEdit = true }: { canEdit?: boolean })
               <label className={LABEL}>E-mail</label>
               <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@exemplo.com" className={INPUT} />
             </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL}>Tipo</label>
+              <select value={form.tipo} onChange={(e) => set("tipo", e.target.value)} className={INPUT}>
+                <option value="consultor">Consultor</option>
+                <option value="gerente">Gerente</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+
+            {form.tipo === "consultor" && (
+              <div className="flex flex-col gap-1.5">
+                <label className={LABEL}>Gerente responsável</label>
+                <select value={form.gerente_id} onChange={(e) => set("gerente_id", e.target.value)} className={INPUT}>
+                  <option value="">Nenhum</option>
+                  {gerentes.map((g) => (
+                    <option key={g.id} value={g.id}>{g.nome}</option>
+                  ))}
+                </select>
+                {gerentes.length === 0 && (
+                  <p className="text-[11px] text-amber-600">Nenhum gerente cadastrado ainda. Cadastre um vendedor com tipo Gerente primeiro.</p>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3 sm:col-span-2">
               <input type="checkbox" id="ativo-v" checked={form.ativo} onChange={(e) => set("ativo", e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-folk" />
               <label htmlFor="ativo-v" className="text-sm text-gray-700">Ativo</label>
             </div>
+
             {erroForm && <div className="sm:col-span-2"><Alert status="error" message={erroForm} /></div>}
             <div className="flex gap-3 sm:col-span-2">
               <button type="submit" disabled={salvando} className="rounded-2xl bg-folk-gradient px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-60">
@@ -154,33 +210,42 @@ export default function VendedoresTab({ canEdit = true }: { canEdit?: boolean })
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="py-3 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nome</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
+                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Gerente</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Telefone</th>
-                <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">E-mail</th>
                 <th className="py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="py-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {registros.map((r) => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3.5 pl-6 pr-4 text-sm font-medium text-gray-900">{r.nome}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.telefone || "—"}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.email || "—"}</td>
-                  <td className="py-3.5 pr-4">
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${r.ativo ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
-                      {r.ativo ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                  <td className="py-3.5 pr-6">
-                    <div className="flex items-center gap-2">
-                      {canEdit && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>}
-                      <button onClick={() => toggleAtivo(r)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${r.ativo ? "border-amber-100 text-amber-600 hover:bg-amber-50" : "border-green-100 text-green-600 hover:bg-green-50"}`}>
-                        {r.ativo ? "Inativar" : "Ativar"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {registros.map((r) => {
+                const gerenteNome = r.gerente_id ? registros.find((v) => v.id === r.gerente_id)?.nome : null;
+                return (
+                  <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 pl-6 pr-4 text-sm font-medium text-gray-900">{r.nome}</td>
+                    <td className="py-3.5 pr-4">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${BADGE_TIPO[r.tipo ?? "outro"]}`}>
+                        {LABEL_TIPO[r.tipo ?? "outro"]}
+                      </span>
+                    </td>
+                    <td className="py-3.5 pr-4 text-sm text-gray-500">{gerenteNome ?? "—"}</td>
+                    <td className="py-3.5 pr-4 text-sm text-gray-500">{r.telefone || "—"}</td>
+                    <td className="py-3.5 pr-4">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${r.ativo ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                        {r.ativo ? "Ativo" : "Inativo"}
+                      </span>
+                    </td>
+                    <td className="py-3.5 pr-6">
+                      <div className="flex items-center gap-2">
+                        {canEdit && <button onClick={() => abrirEditar(r)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-folk/30 hover:text-folk">Editar</button>}
+                        <button onClick={() => toggleAtivo(r)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${r.ativo ? "border-amber-100 text-amber-600 hover:bg-amber-50" : "border-green-100 text-green-600 hover:bg-green-50"}`}>
+                          {r.ativo ? "Inativar" : "Ativar"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
