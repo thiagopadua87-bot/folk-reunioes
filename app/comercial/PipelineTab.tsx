@@ -539,7 +539,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
       }
       await sincronizarOpportunityCompetitors(savedId, competitorIds);
       markClean();
-      await carregar();
+      setSalvando(false); // libera o botão imediatamente após o save
+      carregar();         // recarrega em background sem bloquear a UI
       if (editando) {
         if (form.status === "fechado" && editando.status !== "fechado") {
           handleConverter({ ...editando, ...payload } as PipelineItem);
@@ -553,7 +554,8 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
       }
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "Erro ao salvar.");
-    } finally { setSalvando(false); }
+      setSalvando(false);
+    }
   }
 
   function handleSolicitarExclusao(id: string) {
