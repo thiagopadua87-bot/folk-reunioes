@@ -568,12 +568,13 @@ export async function listarComissoesPorCompetencia(competencia: string): Promis
 }
 
 export async function listarComissoesHistorico(filtros?: {
-  vendedorId?: string;
-  competencia?: string;
-  status?: StatusComissao;
-  limit?: number;
+  vendedorId?:        string;
+  competencia?:       string;
+  competenciaInicio?: string;
+  competenciaFim?:    string;
+  status?:            StatusComissao;
+  limit?:             number;
 }): Promise<Comissao[]> {
-  
 
   let q = supabase
     .from("comissoes")
@@ -583,11 +584,13 @@ export async function listarComissoesHistorico(filtros?: {
       venda:vendas!venda_id(cliente, data_fechamento, tipo_venda, venda_servicos(servico))
     `)
     .order("created_at", { ascending: false })
-    .limit(filtros?.limit ?? 200);
+    .limit(filtros?.limit ?? 500);
 
-  if (filtros?.vendedorId)  q = q.eq("vendedor_id", filtros.vendedorId);
-  if (filtros?.competencia) q = q.eq("competencia", filtros.competencia);
-  if (filtros?.status)      q = q.eq("status", filtros.status);
+  if (filtros?.vendedorId)        q = q.eq("vendedor_id",  filtros.vendedorId);
+  if (filtros?.competencia)       q = q.eq("competencia",  filtros.competencia);
+  if (filtros?.competenciaInicio) q = q.gte("competencia", filtros.competenciaInicio);
+  if (filtros?.competenciaFim)    q = q.lte("competencia", filtros.competenciaFim);
+  if (filtros?.status)            q = q.eq("status",       filtros.status);
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);

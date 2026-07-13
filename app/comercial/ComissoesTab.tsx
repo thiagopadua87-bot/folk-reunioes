@@ -10,13 +10,15 @@ import ComissoesDashboard from "./comissoes/ComissoesDashboard";
 import CompetenciasTable  from "./comissoes/CompetenciasTable";
 import ConfiguracaoRegras from "./comissoes/ConfiguracaoRegras";
 import HistoricoComissoes from "./comissoes/HistoricoComissoes";
+import RelatorioComissoes  from "./comissoes/RelatorioComissoes";
 
-type SubAba = "dashboard" | "competencias" | "historico" | "regras";
+type SubAba = "dashboard" | "competencias" | "historico" | "relatorio" | "regras";
 
 const SUB_ABAS: { value: SubAba; label: string }[] = [
   { value: "dashboard",    label: "Dashboard"    },
   { value: "competencias", label: "Competências" },
   { value: "historico",    label: "Histórico"    },
+  { value: "relatorio",    label: "Relatório"    },
   { value: "regras",       label: "Regras"       },
 ];
 
@@ -99,6 +101,10 @@ export default function ComissoesTab() {
 
       {subAba === "historico" && (
         <HistoricoComissoes />
+      )}
+
+      {subAba === "relatorio" && (
+        <RelatorioComissoes />
       )}
 
       {subAba === "regras" && isAdmin && (
