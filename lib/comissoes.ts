@@ -88,7 +88,8 @@ export interface Competencia {
 export interface Comissao {
   id:                  string;
   venda_id:            string;
-  vendedor_id:         string;
+  vendedor_id:         string | null;
+  indicador_ref_id:    string | null;
   tipo_beneficiario:   TipoBeneficiario;
   regra_id:            string | null;
   competencia:         string | null;
@@ -376,7 +377,7 @@ export async function calcularEInserirComissoes(vendaId: string): Promise<void> 
     .from("vendas")
     .select(`
       id, tipo_venda, valor_mensal, valor_implantacao,
-      vendedor_id, gerente_id, indicador_id, data_fechamento,
+      vendedor_id, gerente_id, indicado_por_id, data_fechamento,
       venda_servicos(servico),
       vendedor:vendedores!vendedor_id(id, tipo, gerente_id)
     `)
@@ -393,7 +394,7 @@ export async function calcularEInserirComissoes(vendaId: string): Promise<void> 
   const vendedorInfo      = venda.vendedor as unknown as { id: string; tipo: string; gerente_id: string | null } | null;
   const vendedorEhGerente = vendedorInfo?.tipo === "gerente";
   const gerenteId         = (venda.gerente_id ?? vendedorInfo?.gerente_id) as string | null;
-  const temIndicador      = !!venda.indicador_id;
+  const temIndicador      = !!(venda.indicado_por_id as string | null);
 
   const calc = calcularPorRegra(
     regra,
@@ -439,10 +440,11 @@ export async function calcularEInserirComissoes(vendaId: string): Promise<void> 
     });
   }
 
-  if (calc.indicador && venda.indicador_id) {
+  if (calc.indicador && (venda.indicado_por_id as string | null)) {
     rows.push({
       venda_id:          vendaId,
-      vendedor_id:       venda.indicador_id,
+      vendedor_id:       null,
+      indicador_ref_id:  venda.indicado_por_id,
       tipo_beneficiario: "indicador",
       regra_id:          regra.id,
       valor_base_mensal: calc.indicador.valor_mensal,
@@ -520,7 +522,8 @@ export async function listarComissoesPorCompetencia(competencia: string): Promis
     const c: Comissao = {
       id:                  row.id as string,
       venda_id:            row.venda_id as string,
-      vendedor_id:         row.vendedor_id as string,
+      vendedor_id:         row.vendedor_id as string | null,
+      indicador_ref_id:    row.indicador_ref_id as string | null,
       tipo_beneficiario:   row.tipo_beneficiario as TipoBeneficiario,
       regra_id:            row.regra_id as string | null,
       competencia:         row.competencia as string | null,
@@ -546,7 +549,7 @@ export async function listarComissoesPorCompetencia(competencia: string): Promis
       venda_servicos:      venda?.venda_servicos?.map((s) => s.servico) ?? [],
     };
 
-    const vid = c.vendedor_id;
+    const vid = c.vendedor_id ?? c.indicador_ref_id ?? "";
     if (!map.has(vid)) {
       map.set(vid, {
         vendedor_id:    vid,
@@ -581,6 +584,7 @@ export async function listarComissoesHistorico(filtros?: {
     .select(`
       *,
       vendedor:vendedores!vendedor_id(nome),
+      indicador:indicadores!indicador_ref_id(nome),
       venda:vendas!venda_id(cliente, data_fechamento, tipo_venda, venda_servicos(servico))
     `)
     .order("created_at", { ascending: false })
@@ -596,12 +600,14 @@ export async function listarComissoesHistorico(filtros?: {
   if (error) throw new Error(error.message);
 
   return ((data ?? []) as Record<string, unknown>[]).map((row) => {
-    const vendedor = row.vendedor as { nome: string } | null;
-    const venda    = row.venda    as { cliente: string; data_fechamento: string; tipo_venda: string; venda_servicos: { servico: string }[] } | null;
+    const vendedor  = row.vendedor  as { nome: string } | null;
+    const indicador = row.indicador as { nome: string } | null;
+    const venda     = row.venda     as { cliente: string; data_fechamento: string; tipo_venda: string; venda_servicos: { servico: string }[] } | null;
     return {
       id:                  row.id as string,
       venda_id:            row.venda_id as string,
-      vendedor_id:         row.vendedor_id as string,
+      vendedor_id:         row.vendedor_id as string | null,
+      indicador_ref_id:    row.indicador_ref_id as string | null,
       tipo_beneficiario:   row.tipo_beneficiario as TipoBeneficiario,
       regra_id:            row.regra_id as string | null,
       competencia:         row.competencia as string | null,
@@ -620,7 +626,7 @@ export async function listarComissoesHistorico(filtros?: {
       data_pagamento:      row.data_pagamento as string | null,
       observacoes:         (row.observacoes as string) ?? "",
       created_at:          row.created_at as string,
-      vendedor_nome:       vendedor?.nome,
+      vendedor_nome:       vendedor?.nome ?? indicador?.nome,
       venda_cliente:       venda?.cliente,
       venda_data:          venda?.data_fechamento,
       venda_tipo:          venda?.tipo_venda,

@@ -249,6 +249,60 @@ export async function editarSindicoGestor(id: string, payload: SindicoGestorPayl
   if (error) throw new Error(error.message);
 }
 
+// ── Indicadores ──────────────────────────────────────────────
+
+export const TIPOS_INDICADOR = [
+  "Pessoa Física",
+  "Empresa",
+  "Corretor",
+  "Outro",
+] as const;
+
+export type TipoIndicador = (typeof TIPOS_INDICADOR)[number];
+
+export interface Indicador {
+  id:         string;
+  user_id:    string;
+  nome:       string;
+  telefone:   string;
+  email:      string;
+  tipo:       TipoIndicador;
+  ativo:      boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type IndicadorPayload = Omit<Indicador, "id" | "user_id" | "created_at" | "updated_at">;
+
+export interface FiltrosIndicadores { busca?: string; ativo?: boolean | null }
+
+export async function listarIndicadores(filtros?: FiltrosIndicadores): Promise<Indicador[]> {
+  let q = supabase.from("indicadores").select("*").order("nome");
+  if (filtros?.ativo != null) q = q.eq("ativo", filtros.ativo);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const lista = (data ?? []) as Indicador[];
+  if (filtros?.busca) {
+    const b = filtros.busca.toLowerCase();
+    return lista.filter((s) => s.nome.toLowerCase().includes(b) || s.tipo.toLowerCase().includes(b));
+  }
+  return lista;
+}
+
+export async function criarIndicador(payload: IndicadorPayload): Promise<Indicador> {
+  const { data, error } = await supabase.from("indicadores").insert(payload).select().single();
+  if (error || !data) throw new Error(error?.message ?? "Erro ao criar indicador.");
+  return data as Indicador;
+}
+
+export async function editarIndicador(id: string, payload: IndicadorPayload): Promise<void> {
+  const { error } = await supabase
+    .from("indicadores")
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // ── Motivos de Perda ─────────────────────────────────────────
 
 export interface MotivoPerda {

@@ -103,7 +103,8 @@ export interface Venda {
   vendedor_id: string | null;
   vendedor_nome: string | null;
   gerente_id: string | null;
-  indicador_id: string | null;
+  indicador_id:    string | null;
+  indicado_por_id: string | null;
   cnpj: string;
   cliente: string;
   valor_implantacao: number;

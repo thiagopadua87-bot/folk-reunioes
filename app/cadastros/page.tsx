@@ -8,6 +8,7 @@ import TerceirizadosTab from "./TerceirizadosTab";
 import CompetitoresTab from "./CompetitoresTab";
 import MotivosDePerda from "./MotivosDePerda";
 import SindicosGestoresTab from "./SindicosGestoresTab";
+import IndicadoresTab      from "./IndicadoresTab";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 import { usePermissions, AccessDenied } from "@/app/components/PermissionsProvider";
 import type { ScreenKey } from "@/lib/permissions";
@@ -18,7 +19,8 @@ type Aba =
   | "terceirizados"
   | "concorrentes"
   | "motivos_perda"
-  | "sindicos_gestores";
+  | "sindicos_gestores"
+  | "indicadores";
 
 const ABAS: { value: Aba; label: string; descricao: string }[] = [
   { value: "vendedores",        label: "Vendedores",        descricao: "Equipe comercial responsável pelas vendas" },
@@ -27,6 +29,7 @@ const ABAS: { value: Aba; label: string; descricao: string }[] = [
   { value: "concorrentes",      label: "Concorrentes",      descricao: "Empresas concorrentes presentes nas oportunidades" },
   { value: "motivos_perda",     label: "Motivos de Perda",  descricao: "Cadastro dos motivos utilizados na gestão de clientes perdidos" },
   { value: "sindicos_gestores", label: "Síndicos/Gestores", descricao: "Síndicos e gestores vinculados aos leads do pipeline" },
+  { value: "indicadores",       label: "Indicadores",       descricao: "Pessoas e empresas que indicam clientes e recebem comissão" },
 ];
 
 const TAB_KEYS: Record<Aba, ScreenKey> = {
@@ -36,6 +39,7 @@ const TAB_KEYS: Record<Aba, ScreenKey> = {
   concorrentes:      "cadastros.concorrentes",
   motivos_perda:     "cadastros.motivos_perda",
   sindicos_gestores: "cadastros.sindicos_gestores",
+  indicadores:       "cadastros.indicadores",
 };
 
 function CadastrosPageContent() {
@@ -81,6 +85,7 @@ function CadastrosPageContent() {
           {aba === "concorrentes"      && <CompetitoresTab canEdit={tabPerm.can_edit} />}
           {aba === "motivos_perda"     && <MotivosDePerda canEdit={tabPerm.can_edit} />}
           {aba === "sindicos_gestores" && <SindicosGestoresTab canEdit={tabPerm.can_edit} />}
+          {aba === "indicadores"       && <IndicadoresTab      canEdit={tabPerm.can_edit} />}
         </>
       )}
     </main>

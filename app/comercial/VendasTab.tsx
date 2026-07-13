@@ -8,7 +8,7 @@ import {
   type Venda, type VendaPayload, type VendaLog, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
 import { calcularEInserirComissoes, verificarELiberarComissoes, recalcularComissoesDaVenda } from "@/lib/comissoes";
-import { listarVendedores, type Vendedor } from "@/lib/cadastros";
+import { listarVendedores, listarIndicadores, type Vendedor, type Indicador } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
@@ -47,33 +47,31 @@ const TIPO_BADGE: Record<TipoVenda, string> = {
 };
 
 interface FormState {
-  data_fechamento: string;
-  vendedor_id: string;
-  gerente_id: string;
-  indicador_id: string;
-  cnpj: string;
-  cliente: string;
+  data_fechamento:   string;
+  vendedor_id:       string;
+  gerente_id:        string;
+  indicado_por_id:   string;
+  cnpj:              string;
+  cliente:           string;
   valor_implantacao: string;
-  valor_mensal: string;
-  servicos: string[];
-  tipo_venda: TipoVenda;
-  indicado_por: string;
-  observacoes: string;
+  valor_mensal:      string;
+  servicos:          string[];
+  tipo_venda:        TipoVenda;
+  observacoes:       string;
 }
 
 const FORM_VAZIO: FormState = {
-  data_fechamento: "",
-  vendedor_id: "",
-  gerente_id: "",
-  indicador_id: "",
-  cnpj: "",
-  cliente: "",
+  data_fechamento:   "",
+  vendedor_id:       "",
+  gerente_id:        "",
+  indicado_por_id:   "",
+  cnpj:              "",
+  cliente:           "",
   valor_implantacao: "",
-  valor_mensal: "",
-  servicos: [],
-  tipo_venda: "recorrente",
-  indicado_por: "",
-  observacoes: "",
+  valor_mensal:      "",
+  servicos:          [],
+  tipo_venda:        "recorrente",
+  observacoes:       "",
 };
 
 function formatarCNPJ(v: string): string {
@@ -119,21 +117,21 @@ function formDePreenchimento(p: PreenchimentoVenda): FormState {
     data_fechamento:   new Date().toISOString().slice(0, 10),
     vendedor_id:       p.vendedor_id ?? "",
     gerente_id:        "",
-    indicador_id:      "",
+    indicado_por_id:   "",
     cnpj:              "",
     cliente:           p.cliente,
     valor_implantacao: String(p.valor_implantacao || ""),
     valor_mensal:      String(p.valor_mensal || ""),
     servicos:          p.servicos,
     tipo_venda:        "recorrente",
-    indicado_por:      p.indicado_por,
     observacoes:       p.observacoes,
   };
 }
 
 export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit = true, canDelete = true }: VendasTabProps) {
-  const [registros, setRegistros] = useState<Venda[]>([]);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [registros,   setRegistros]   = useState<Venda[]>([]);
+  const [vendedores,  setVendedores]  = useState<Vendedor[]>([]);
+  const [indicadores, setIndicadores] = useState<Indicador[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "form">(preenchimento ? "form" : "list");
@@ -164,14 +162,16 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
     const reqId = ++reqIdRef.current;
     setCarregando(true); setErro(null);
     try {
-      const [pagina_dados, vends] = await Promise.all([
+      const [pagina_dados, vends, inds] = await Promise.all([
         listarVendas({ dataInicio: filtros.dataInicio || undefined, dataFim: filtros.dataFim || undefined, tipoVenda: filtros.tipoVenda || undefined, cliente: filtros.cliente || undefined, vendedorId: filtros.vendedorId || undefined, pagina, porPagina }),
         listarVendedores({ ativo: true }),
+        listarIndicadores({ ativo: true }),
       ]);
       if (reqId !== reqIdRef.current) return;
       setRegistros(pagina_dados.registros);
       setTotal(pagina_dados.total);
       setVendedores(vends);
+      setIndicadores(inds);
     } catch (e) {
       if (reqId !== reqIdRef.current) return;
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
@@ -199,7 +199,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
   function abrirNovo() { setEditando(null); setForm(FORM_VAZIO); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); markClean(); setView("form"); }
   function abrirEditar(r: Venda) {
     setEditando(r);
-    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", gerente_id: r.gerente_id ?? "", indicador_id: r.indicador_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, indicado_por: r.indicado_por, observacoes: r.observacoes });
+    setForm({ data_fechamento: r.data_fechamento, vendedor_id: r.vendedor_id ?? "", gerente_id: r.gerente_id ?? "", indicado_por_id: r.indicado_por_id ?? "", cnpj: r.cnpj ? formatarCNPJ(r.cnpj) : "", cliente: r.cliente, valor_implantacao: String(r.valor_implantacao), valor_mensal: String(r.valor_mensal), servicos: r.servicos ?? [], tipo_venda: r.tipo_venda, observacoes: r.observacoes });
     setErroForm(null); setErroCNPJ(null); setArquivo(null); markClean(); setView("form"); carregarLogs(r.id);
   }
   function cancelar() { guardCancel(() => { setView("list"); setEditando(null); setErroForm(null); setErroCNPJ(null); setArquivo(null); setLogs([]); onPreenchimentoUsado?.(); }); }
@@ -231,15 +231,16 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
     try {
       const payload: VendaPayload = {
         data_fechamento:   form.data_fechamento,
-        vendedor_id:       form.vendedor_id   || null,
-        gerente_id:        form.gerente_id    || null,
-        indicador_id:      form.indicador_id  || null,
+        vendedor_id:       form.vendedor_id       || null,
+        gerente_id:        form.gerente_id        || null,
+        indicador_id:      null,
+        indicado_por_id:   form.indicado_por_id   || null,
+        indicado_por:      editando?.indicado_por ?? "",
         cnpj:              form.cnpj.replace(/\D/g, ""),
         cliente:           form.cliente.trim(),
         valor_implantacao: parseFloat(form.valor_implantacao.replace(",", ".")) || 0,
         valor_mensal:      parseFloat(form.valor_mensal.replace(",", ".")) || 0,
         tipo_venda:        form.tipo_venda,
-        indicado_por:      form.indicado_por.trim(),
         observacoes:       form.observacoes.trim(),
         pipeline_id:       preenchimento?.pipeline_id ?? (editando?.pipeline_id ?? null),
         contrato_assinado: editando?.contrato_assinado ?? false,
@@ -389,15 +390,11 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Indicador (comissão)</label>
-              <select value={form.indicador_id} onChange={(e) => set("indicador_id", e.target.value)} className={INPUT}>
+              <label className={LABEL}>Indicado por</label>
+              <select value={form.indicado_por_id} onChange={(e) => set("indicado_por_id", e.target.value)} className={INPUT}>
                 <option value="">Nenhum</option>
-                {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                {indicadores.map((i) => <option key={i.id} value={i.id}>{i.nome} — {i.tipo}</option>)}
               </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={LABEL}>Indicado por (texto)</label>
-              <input type="text" value={form.indicado_por} onChange={(e) => set("indicado_por", e.target.value)} placeholder="Nome do indicador (livre)" className={INPUT} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL}>Implantação (R$)</label>
@@ -502,7 +499,16 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
               {visualizando.valor_implantacao > 0 && <div><dt className={LABEL}>Implantação</dt><dd className="mt-0.5 text-sm font-semibold text-gray-800">{formatMoeda(visualizando.valor_implantacao)}</dd></div>}
               {visualizando.valor_mensal > 0 && <div><dt className={LABEL}>Mensal</dt><dd className="mt-0.5 text-sm font-semibold text-emerald-700">{formatMoeda(visualizando.valor_mensal)}/mês</dd></div>}
               {visualizando.vendedor_nome && <div><dt className={LABEL}>Vendedor</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.vendedor_nome}</dd></div>}
-              {visualizando.indicado_por && <div><dt className={LABEL}>Indicado por</dt><dd className="mt-0.5 text-sm text-gray-800">{visualizando.indicado_por}</dd></div>}
+              {(visualizando.indicado_por_id || visualizando.indicado_por) && (
+                <div>
+                  <dt className={LABEL}>Indicado por</dt>
+                  <dd className="mt-0.5 text-sm text-gray-800">
+                    {visualizando.indicado_por_id
+                      ? (indicadores.find((i) => i.id === visualizando.indicado_por_id)?.nome ?? "—")
+                      : visualizando.indicado_por}
+                  </dd>
+                </div>
+              )}
               {visualizando.servicos?.length > 0 && (
                 <div><dt className={LABEL}>Serviços</dt><dd className="mt-1 flex flex-wrap gap-1">{visualizando.servicos.map((s) => <span key={s} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{s}</span>)}</dd></div>
               )}

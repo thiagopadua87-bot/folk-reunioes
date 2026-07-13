@@ -95,10 +95,10 @@ export default function RelatorioComissoes() {
   const linhas: LinhaVendedor[] = useMemo(() => {
     const mapa = new Map<string, LinhaVendedor>();
     for (const c of comissoes) {
-      const key = c.vendedor_id;
+      const key = c.vendedor_id ?? c.indicador_ref_id ?? "";
       if (!mapa.has(key)) {
         mapa.set(key, {
-          vendedor_id:   c.vendedor_id,
+          vendedor_id:   key,
           vendedor_nome: c.vendedor_nome ?? "—",
           tipo:          c.tipo_beneficiario,
           qtd:           0,

@@ -26,7 +26,8 @@ export type ScreenKey =
   | "cadastros.terceirizados"
   | "cadastros.concorrentes"
   | "cadastros.motivos_perda"
-  | "cadastros.sindicos_gestores";
+  | "cadastros.sindicos_gestores"
+  | "cadastros.indicadores";
 
 export interface ScreenPermission {
   can_view:   boolean;
@@ -73,6 +74,7 @@ export const SCREENS: ScreenDef[] = [
   { key: "cadastros.concorrentes",    label: "Concorrentes",     group: "Cadastros", hasEdit: true,  hasDelete: false },
   { key: "cadastros.motivos_perda",   label: "Motivos de Perda", group: "Cadastros", hasEdit: true,  hasDelete: false },
   { key: "cadastros.sindicos_gestores", label: "Síndicos/Gestores", group: "Cadastros", hasEdit: true, hasDelete: false },
+  { key: "cadastros.indicadores",       label: "Indicadores",       group: "Cadastros", hasEdit: true, hasDelete: false },
 ];
 
 // ── Grupos para exibição ──────────────────────────────────────
