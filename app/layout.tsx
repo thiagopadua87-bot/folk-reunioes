@@ -4,6 +4,7 @@ import "./globals.css";
 import AppSidebar from "./components/AppSidebar";
 import MainLayout from "./components/MainLayout";
 import { PermissionsProvider } from "./components/PermissionsProvider";
+import SessionWatcher from "./components/SessionWatcher";
 import { UnsavedChangesProvider } from "@/lib/unsaved-changes";
 
 const inter = Inter({
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="min-h-full bg-[#F5F5F5] text-gray-900">
         <UnsavedChangesProvider>
           <PermissionsProvider>
+            <SessionWatcher />
             <AppSidebar />
             <MainLayout>{children}</MainLayout>
           </PermissionsProvider>

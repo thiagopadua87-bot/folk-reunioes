@@ -70,7 +70,13 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     load();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => load());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      // TOKEN_REFRESHED não requer recarregar permissões — evita queries desnecessárias
+      // SIGNED_OUT é tratado pelo SessionWatcher (redirect para /login)
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
+        load();
+      }
+    });
     return () => subscription.unsubscribe();
   }, [load]);
 

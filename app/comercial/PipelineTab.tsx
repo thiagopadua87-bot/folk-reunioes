@@ -17,6 +17,7 @@ import {
 } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
+import { supabase } from "@/lib/supabase";
 import KanbanPipeline from "./KanbanPipeline";
 
 // ── Estilos visuais ──────────────────────────────────────────
@@ -369,31 +370,71 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
   }, [logs]);
 
   const reqIdRef = useRef(0);
+  // Garante que setCarregando(false) pode ser chamado externamente se necessário
+  const setCarregandoRef = useRef(setCarregando);
+  useEffect(() => { setCarregandoRef.current = setCarregando; }, []);
 
   const carregar = useCallback(async () => {
     const reqId = ++reqIdRef.current;
+    const t0 = performance.now();
+    console.log(`[Pipeline] carregar() iniciado — reqId=${reqId}`);
     setCarregando(true); setErro(null);
     try {
+      // Cada query loga individualmente — ajuda a identificar qual trava
       const [lista, vends, comps, sindicos] = await Promise.all([
-        listarPipeline(),
-        listarVendedores({ ativo: true }),
-        listarCompetitors({ status: "ativo" }),
-        listarSindicosGestores(),
+        listarPipeline().then((r) => {
+          console.log(`[Pipeline] listarPipeline: ${r.length} itens — ${Math.round(performance.now() - t0)}ms`);
+          return r;
+        }).catch((e: unknown) => { console.error("[Pipeline] listarPipeline FALHOU:", e); throw e; }),
+        listarVendedores({ ativo: true }).then((r) => {
+          console.log(`[Pipeline] listarVendedores: ${r.length} itens — ${Math.round(performance.now() - t0)}ms`);
+          return r;
+        }).catch((e: unknown) => { console.error("[Pipeline] listarVendedores FALHOU:", e); throw e; }),
+        listarCompetitors({ status: "ativo" }).then((r) => {
+          console.log(`[Pipeline] listarCompetitors: ${r.length} itens — ${Math.round(performance.now() - t0)}ms`);
+          return r;
+        }).catch((e: unknown) => { console.error("[Pipeline] listarCompetitors FALHOU:", e); throw e; }),
+        listarSindicosGestores().then((r) => {
+          console.log(`[Pipeline] listarSindicosGestores: ${r.length} itens — ${Math.round(performance.now() - t0)}ms`);
+          return r;
+        }).catch((e: unknown) => { console.error("[Pipeline] listarSindicosGestores FALHOU:", e); throw e; }),
       ]);
-      if (reqId !== reqIdRef.current) return;
+      if (reqId !== reqIdRef.current) {
+        console.log(`[Pipeline] reqId=${reqId} obsoleto (atual=${reqIdRef.current}) — descartando`);
+        return;
+      }
       setRegistros(lista);
       setVendedores(vends);
       setAllCompetitors(comps);
       setAllSindicosGestores(sindicos);
+      console.log(`[Pipeline] concluído — reqId=${reqId}, ${lista.length} leads, ${Math.round(performance.now() - t0)}ms total`);
     } catch (e) {
-      if (reqId !== reqIdRef.current) return;
+      if (reqId !== reqIdRef.current) {
+        console.log(`[Pipeline] erro em reqId=${reqId} obsoleto — ignorando`);
+        return;
+      }
+      console.error(`[Pipeline] erro no carregamento — reqId=${reqId}:`, e);
       setErro(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally {
-      if (reqId === reqIdRef.current) setCarregando(false);
+      if (reqId === reqIdRef.current) {
+        console.log(`[Pipeline] setCarregando(false) — reqId=${reqId}, ${Math.round(performance.now() - t0)}ms`);
+        setCarregando(false);
+      } else {
+        console.warn(`[Pipeline] ATENÇÃO: reqId=${reqId} obsoleto — setCarregando(false) NÃO chamado (atual=${reqIdRef.current})`);
+      }
     }
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Expõe diagnóstico no DevTools: window.__folkPipeline.reload() | .status()
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__folkPipeline = {
+      reload: carregar,
+      status: () => ({ reqId: reqIdRef.current }),
+    };
+    return () => { delete (window as unknown as Record<string, unknown>).__folkPipeline; };
+  }, [carregar]);
 
   async function carregarLogs(id: string) {
     setCarregandoLogs(true);
@@ -502,6 +543,12 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
     if (!form.data_inicio_lead || !form.cliente) { setErroForm("Preencha todos os campos obrigatórios."); return; }
     setSalvando(true); setErroForm(null);
     try {
+      // Verificar sessão ativa antes de salvar
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Sua sessão expirou. Recarregue a página (F5) e tente novamente.");
+      }
+
       const payload: PipelinePayload = {
         data_inicio_lead:      form.data_inicio_lead,
         vendedor_id:           form.vendedor_id || null,
@@ -530,14 +577,24 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
         google_event_id:        editando?.google_event_id ?? null,
         google_sync_status:     editando?.google_sync_status ?? "nao_sincronizado",
       };
-      let savedId: string;
-      if (editando) {
-        await editarPipelineItem(editando.id, payload, editando, vendedores);
-        savedId = editando.id;
-      } else {
-        savedId = await criarPipelineItem(payload);
-      }
-      await sincronizarOpportunityCompetitors(savedId, competitorIds);
+
+      // Timeout de 20s — garante que o botão nunca fica preso se a rede ou sessão travar
+      const operacao = async (): Promise<string> => {
+        let savedId: string;
+        if (editando) {
+          await editarPipelineItem(editando.id, payload, editando, vendedores);
+          savedId = editando.id;
+        } else {
+          savedId = await criarPipelineItem(payload);
+        }
+        await sincronizarOpportunityCompetitors(savedId, competitorIds);
+        return savedId;
+      };
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("A operação demorou demais. Verifique sua conexão e tente novamente.")), 20_000)
+      );
+      const savedId = await Promise.race([operacao(), timeout]);
+
       markClean();
       setSalvando(false); // libera o botão imediatamente após o save
       carregar();         // recarrega em background sem bloquear a UI
@@ -601,18 +658,29 @@ export default function PipelineTab({ onConverter, onIrParaVendas, canEdit = tru
     setSalvandoAgenda(true);
     setAgendaRegistrada(false);
     try {
-      const res = await fetch("/api/agenda/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pipeline_id: editando.id, action: "sync" }),
-      });
+      const ctrl = new AbortController();
+      const agendaTimeout = setTimeout(() => ctrl.abort(), 30_000);
+      let res: Response;
+      try {
+        res = await fetch("/api/agenda/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pipeline_id: editando.id, action: "sync" }),
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(agendaTimeout);
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro ao sincronizar.");
       setAgendaRegistrada(true);
       setTimeout(() => setAgendaRegistrada(false), 5000);
       await carregar();
     } catch (e) {
-      setErroForm(e instanceof Error ? e.message : "Erro ao sincronizar com Google Calendar.");
+      const msg = e instanceof Error ? e.message : "Erro ao sincronizar com Google Calendar.";
+      setErroForm(e instanceof Error && e.name === "AbortError"
+        ? "Sincronização demorou demais. Verifique sua conexão e tente novamente."
+        : msg);
     } finally {
       setSalvandoAgenda(false);
     }
