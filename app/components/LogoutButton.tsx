@@ -13,12 +13,9 @@ export default function LogoutButton({ className }: LogoutButtonProps) {
   async function handleLogout() {
     if (saindo) return;
     setSaindo(true);
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // ignora erro de rede — sessão local já foi limpa
-    }
-    // Redireciona via window.location para garantir reload completo e limpar estado
+    // Timeout de 3s para não bloquear o redirect se o signOut travar
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 1500));
+    await Promise.race([supabase.auth.signOut().then(() => {}).catch(() => {}), timeout]);
     window.location.href = "/login";
   }
 
