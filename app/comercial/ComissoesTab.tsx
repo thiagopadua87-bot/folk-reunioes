@@ -34,6 +34,7 @@ export default function ComissoesTab() {
   // controle de quais abas já foram carregadas (evita re-fetch ao voltar)
   const carregadas = useRef<Set<SubAba>>(new Set());
   const [carregandoAba, setCarregandoAba] = useState(false);
+  const [erroAba, setErroAba] = useState<string | null>(null);
 
   const subAbas = isAdmin ? SUB_ABAS : SUB_ABAS.filter((s) => s.value !== "regras");
 
@@ -42,12 +43,13 @@ export default function ComissoesTab() {
 
     async function carregar() {
       setCarregandoAba(true);
+      setErroAba(null);
       try {
         if (subAba === "dashboard") {
           const [d, c] = await Promise.all([buscarResumoDashboard(), listarCompetencias()]);
           setDashboard(d);
           setCompetencias(c);
-          carregadas.current.add("competencias"); // competências compartilhadas
+          carregadas.current.add("competencias");
         } else if (subAba === "competencias") {
           if (!carregadas.current.has("dashboard")) {
             const c = await listarCompetencias();
@@ -58,8 +60,8 @@ export default function ComissoesTab() {
           setRegras(r);
         }
         carregadas.current.add(subAba);
-      } catch {
-        // componentes filhos mostram seus próprios erros
+      } catch (e) {
+        setErroAba(e instanceof Error ? e.message : "Erro ao carregar.");
       } finally {
         setCarregandoAba(false);
       }
@@ -74,6 +76,7 @@ export default function ComissoesTab() {
     if (subAba === "dashboard") carregadas.current.delete("competencias");
 
     setCarregandoAba(true);
+    setErroAba(null);
     try {
       if (subAba === "dashboard") {
         const [d, c] = await Promise.all([buscarResumoDashboard(), listarCompetencias()]);
@@ -88,8 +91,8 @@ export default function ComissoesTab() {
         setRegras(r);
       }
       carregadas.current.add(subAba);
-    } catch {
-      // silencioso
+    } catch (e) {
+      setErroAba(e instanceof Error ? e.message : "Erro ao carregar.");
     } finally {
       setCarregandoAba(false);
     }
@@ -116,6 +119,18 @@ export default function ComissoesTab() {
 
       {carregandoAba && (
         <p className="text-sm text-gray-400">Carregando...</p>
+      )}
+
+      {!carregandoAba && erroAba && (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          {erroAba}
+          <button
+            onClick={recarregarAbaAtual}
+            className="ml-3 font-semibold underline hover:no-underline"
+          >
+            Tentar novamente
+          </button>
+        </div>
       )}
 
       {!carregandoAba && subAba === "dashboard" && dashboard && (
