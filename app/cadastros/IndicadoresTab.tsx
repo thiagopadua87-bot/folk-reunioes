@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   listarIndicadores, criarIndicador, editarIndicador,
-  TIPOS_INDICADOR,
+  TIPOS_INDICADOR, LABEL_TIPO_INDICADOR,
   type Indicador, type IndicadorPayload, type TipoIndicador,
   type FiltrosIndicadores,
 } from "@/lib/cadastros";
@@ -21,7 +21,7 @@ interface FormState {
   ativo:    boolean;
 }
 
-const FORM_VAZIO: FormState = { nome: "", telefone: "", email: "", tipo: "Pessoa Física", ativo: true };
+const FORM_VAZIO: FormState = { nome: "", telefone: "", email: "", tipo: "pessoa_fisica", ativo: true };
 
 export default function IndicadoresTab({ canEdit = true }: { canEdit?: boolean }) {
   const [registros,  setRegistros]  = useState<Indicador[]>([]);
@@ -103,7 +103,7 @@ export default function IndicadoresTab({ canEdit = true }: { canEdit?: boolean }
               <label className={LABEL}>Tipo *</label>
               <select value={form.tipo} onChange={(e) => set("tipo", e.target.value as TipoIndicador)} className={INPUT}>
                 {TIPOS_INDICADOR.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>{LABEL_TIPO_INDICADOR[t]}</option>
                 ))}
               </select>
             </div>
@@ -187,7 +187,7 @@ export default function IndicadoresTab({ canEdit = true }: { canEdit?: boolean }
               {registros.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                   <td className="py-3.5 pl-6 pr-4 text-sm font-medium text-gray-900">{r.nome}</td>
-                  <td className="py-3.5 pr-4 text-sm text-gray-500">{r.tipo}</td>
+                  <td className="py-3.5 pr-4 text-sm text-gray-500">{LABEL_TIPO_INDICADOR[r.tipo] ?? r.tipo}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{r.telefone || "—"}</td>
                   <td className="py-3.5 pr-4 text-sm text-gray-500">{r.email || "—"}</td>
                   <td className="py-3.5 pr-4">

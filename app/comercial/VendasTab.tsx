@@ -8,7 +8,7 @@ import {
   type Venda, type VendaPayload, type VendaLog, type TipoVenda, type FiltrosVendas, type PreenchimentoVenda,
 } from "@/lib/comercial";
 import { calcularEInserirComissoes, verificarELiberarComissoes, recalcularComissoesDaVenda } from "@/lib/comissoes";
-import { listarVendedores, listarIndicadores, type Vendedor, type Indicador } from "@/lib/cadastros";
+import { listarVendedores, listarIndicadores, LABEL_TIPO_INDICADOR, type Vendedor, type Indicador } from "@/lib/cadastros";
 import { Card, Alert } from "@/app/components/ui";
 import { useUnsavedChanges } from "@/lib/unsaved-changes";
 
@@ -398,7 +398,7 @@ export default function VendasTab({ preenchimento, onPreenchimentoUsado, canEdit
               <label className={LABEL}>Indicado por</label>
               <select value={form.indicado_por_id} onChange={(e) => set("indicado_por_id", e.target.value)} className={INPUT}>
                 <option value="">Nenhum</option>
-                {indicadores.map((i) => <option key={i.id} value={i.id}>{i.nome} — {i.tipo}</option>)}
+                {indicadores.map((i) => <option key={i.id} value={i.id}>{i.nome} — {LABEL_TIPO_INDICADOR[i.tipo] ?? i.tipo}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">

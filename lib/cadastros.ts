@@ -252,13 +252,20 @@ export async function editarSindicoGestor(id: string, payload: SindicoGestorPayl
 // ── Indicadores ──────────────────────────────────────────────
 
 export const TIPOS_INDICADOR = [
-  "Pessoa Física",
-  "Empresa",
-  "Corretor",
-  "Outro",
+  "pessoa_fisica",
+  "empresa",
+  "corretor",
+  "outro",
 ] as const;
 
 export type TipoIndicador = (typeof TIPOS_INDICADOR)[number];
+
+export const LABEL_TIPO_INDICADOR: Record<TipoIndicador, string> = {
+  pessoa_fisica: "Pessoa Física",
+  empresa:       "Empresa",
+  corretor:      "Corretor",
+  outro:         "Outro",
+};
 
 export interface Indicador {
   id:         string;
