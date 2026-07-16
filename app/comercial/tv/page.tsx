@@ -159,7 +159,7 @@ export default function ComercialTVPage() {
 
   // Meta anual: apenas Portaria Remota
   const portaria       = vendas.filter((v) => v.servicos?.includes("Portaria Remota"));
-  const totalReceita   = portaria.reduce((s, v) => s + v.valor_implantacao + v.valor_mensal, 0);
+  const totalReceita   = portaria.reduce((s, v) => s + v.valor_mensal, 0);
   const totalContratos = portaria.length;
   const nivel      = getNivel(totalReceita);
   const pct        = Math.min(totalReceita / META_OURO, 1);
