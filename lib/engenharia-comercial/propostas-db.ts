@@ -85,11 +85,15 @@ export type ChecklistVersao = {
 export async function listarPipelinesDisponiveis(): Promise<PipelineOption[]> {
   const { data, error } = await supabase
     .from("pipeline")
-    .select("id, cliente, responsavel")
-    .not("status", "in", '("fechado","declinado")')
+    .select("id, cliente, vendedores!vendedor_id(nome)")
+    .not("status", "in", '(fechado,declinado)')
     .order("cliente");
   if (error) throw new Error(error.message);
-  return (data ?? []) as PipelineOption[];
+  return (data ?? []).map((d) => {
+    const r = d as Record<string, unknown>;
+    const vend = r.vendedores as { nome: string } | null;
+    return { id: r.id as string, cliente: r.cliente as string, responsavel: vend?.nome ?? "" };
+  });
 }
 
 export async function listarPropostas(filtros?: {
@@ -135,20 +139,21 @@ export async function buscarPropostaDetalhe(id: string, client?: SupabaseClient)
   const db = client ?? supabase;
   const { data, error } = await db
     .from("ec_propostas")
-    .select("id, nome, descricao, status, pipeline_id, created_at, pipeline:pipeline_id(cliente, responsavel)")
+    .select("id, nome, descricao, status, pipeline_id, created_at, pipeline:pipeline_id(cliente, vendedores!vendedor_id(nome))")
     .eq("id", id)
     .single();
   if (error || !data) return null;
   const d = data as Record<string, unknown>;
-  const pip = d.pipeline as Record<string, string> | null;
+  const pip = d.pipeline as Record<string, unknown> | null;
+  const vend = pip?.vendedores as { nome: string } | null;
   return {
     id:          d.id as string,
     nome:        d.nome as string,
     descricao:   d.descricao as string,
     status:      d.status as string,
     pipelineId:  d.pipeline_id as string,
-    cliente:     pip?.cliente ?? "",
-    responsavel: pip?.responsavel ?? "",
+    cliente:     pip?.cliente as string ?? "",
+    responsavel: vend?.nome ?? "",
     createdAt:   d.created_at as string,
   };
 }

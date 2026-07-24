@@ -317,7 +317,7 @@ export async function convertToSale(
 
   const { data: pipeline } = await client
     .from("pipeline")
-    .select("cliente, responsavel")
+    .select("cliente")
     .eq("id", proposta.pipeline_id)
     .single();
 
@@ -328,8 +328,7 @@ export async function convertToSale(
     .insert({
       user_id:          authData.user.id,
       data_fechamento:  new Date().toISOString().slice(0, 10),
-      responsavel:      pipeline.responsavel,
-      cliente:          pipeline.cliente,
+      cliente:          (pipeline as Record<string, unknown>).cliente as string,
       valor_implantacao: prec?.valor_implantacao ?? 0,
       valor_mensal:      prec?.valor_mensal      ?? 0,
       servico:           proposta.nome,
