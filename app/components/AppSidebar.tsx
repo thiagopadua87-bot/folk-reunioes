@@ -32,6 +32,21 @@ function IconCalendar() {
   );
 }
 
+function IconCalculator() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="8" y1="10" x2="10" y2="10" />
+      <line x1="14" y1="10" x2="16" y2="10" />
+      <line x1="8" y1="14" x2="10" y2="14" />
+      <line x1="14" y1="14" x2="16" y2="14" />
+      <line x1="8" y1="18" x2="10" y2="18" />
+      <line x1="14" y1="18" x2="16" y2="18" />
+    </svg>
+  );
+}
+
 function IconBriefcase() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
@@ -153,6 +168,21 @@ const NAV: NavEntry[] = [
       { label: "Vendas",    aba: "vendas",    screenKey: "comercial.vendas" },
       { label: "Dashboard", aba: "dashboard", screenKey: "comercial.dashboard" },
       { label: "Comissões", aba: "comissoes", screenKey: "comercial.comissoes", adminOnly: true },
+    ],
+  },
+  {
+    type: "group", key: "engenharia-comercial", label: "Eng. Comercial", icon: <IconCalculator />,
+    basePath: "/engenharia-comercial", defaultAba: "propostas",
+    items: [
+      { label: "Propostas",    aba: "propostas" },
+      { label: "Fabricantes",  aba: "fabricantes" },
+      { label: "Fornecedores", aba: "fornecedores" },
+      { label: "Categorias",   aba: "categorias" },
+      { label: "Itens",        aba: "itens" },
+      { label: "Kits",         aba: "kits" },
+      { label: "Soluções",     aba: "solucoes" },
+      { label: "Regras",       aba: "regras" },
+      { label: "Parâmetros",   aba: "parametros" },
     ],
   },
   {
