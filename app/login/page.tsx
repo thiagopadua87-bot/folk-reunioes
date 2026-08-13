@@ -19,44 +19,52 @@ export default function LoginPage() {
     setLoading(true);
     setErro(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    try {
+      // Limpa qualquer sessão local stale antes de autenticar para evitar
+      // Navigator Lock contention com PermissionsProvider/SessionWatcher.
+      await supabase.auth.signOut({ scope: "local" });
 
-    if (error || !data.user) {
-      const msg = error?.message ?? "";
-      if (msg.toLowerCase().includes("ban") || msg.toLowerCase().includes("inativ")) {
-        setErro("Conta inativa. Entre em contato com o administrador.");
-      } else {
-        setErro("Email ou senha incorretos.");
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+
+      if (error || !data.user) {
+        const msg = error?.message ?? "";
+        if (msg.toLowerCase().includes("ban") || msg.toLowerCase().includes("inativ")) {
+          setErro("Conta inativa. Entre em contato com o administrador.");
+        } else {
+          setErro("Email ou senha incorretos.");
+        }
+        return;
       }
+
+      // Verificar status do perfil e redirecionar de acordo
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("status, role, ativo")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profile?.ativo === false) {
+        await supabase.auth.signOut();
+        setErro("Conta inativa. Entre em contato com o administrador.");
+        return;
+      }
+
+      const status = profile?.status ?? "pendente";
+
+      if (status === "pendente") {
+        router.push("/pendente");
+      } else if (status === "recusado") {
+        router.push("/recusado");
+      } else {
+        router.push("/");
+      }
+
+      router.refresh();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Verificar status do perfil e redirecionar de acordo
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("status, role, ativo")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profile?.ativo === false) {
-      await supabase.auth.signOut();
-      setErro("Conta inativa. Entre em contato com o administrador.");
-      setLoading(false);
-      return;
-    }
-
-    const status = profile?.status ?? "pendente";
-
-    if (status === "pendente") {
-      router.push("/pendente");
-    } else if (status === "recusado") {
-      router.push("/recusado");
-    } else {
-      router.push("/");
-    }
-
-    router.refresh();
   }
 
   return (
