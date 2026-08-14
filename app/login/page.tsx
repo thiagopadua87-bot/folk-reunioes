@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Alert, Card } from "@/app/components/ui";
 import LogoFolk from "@/app/components/LogoFolk";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,14 +50,12 @@ export default function LoginPage() {
       const status = profile?.status ?? "pendente";
 
       if (status === "pendente") {
-        router.push("/pendente");
+        window.location.href = "/pendente";
       } else if (status === "recusado") {
-        router.push("/recusado");
+        window.location.href = "/recusado";
       } else {
-        router.push("/");
+        window.location.href = "/";
       }
-
-      router.refresh();
     } catch {
       setErro("Erro de conexão. Tente novamente.");
     } finally {
