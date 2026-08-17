@@ -18,10 +18,6 @@ export default function LoginPage() {
     setErro(null);
 
     try {
-      // Limpa qualquer sessão local stale antes de autenticar para evitar
-      // Navigator Lock contention com PermissionsProvider/SessionWatcher.
-      await supabase.auth.signOut({ scope: "local" });
-
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
 
       if (error || !data.user) {
