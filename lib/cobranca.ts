@@ -210,7 +210,7 @@ export async function importarFaturas(
         status: "pendente",
       });
       if (error) {
-        if (error.code === "23505") {
+        if (error.code === "23505" || error.message?.includes("duplicate key")) {
           // Registro existe mas não estava visível no SELECT (ex: RLS) → reabre pelo numero_nota
           const { error: errUpd } = await supabase
             .from("faturas")
