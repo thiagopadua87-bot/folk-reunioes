@@ -132,22 +132,28 @@ export async function importarFaturas(
 ): Promise<ResultadoImportacao> {
   const resultado: ResultadoImportacao = { criadas: 0, atualizadas: 0, quitadas: 0, erros: [] };
 
-  // Busca todas as faturas abertas no banco
+  // Busca todas as faturas do banco (inclusive recebidas/canceladas para evitar conflito de chave única)
   const { data: abertas, error: errAbertas } = await supabase
     .from("faturas")
-    .select("id, numero_nota, valor, data_vencimento")
-    .not("status", "in", '("recebida","cancelada")');
+    .select("id, numero_nota, valor, data_vencimento, status");
 
   if (errAbertas) throw new Error(errAbertas.message);
 
-  const abertasMap = new Map<string, { id: string; valor: number; data_vencimento: string }>();
+  const abertasMap = new Map<string, { id: string; valor: number; data_vencimento: string; status: string }>();
   (abertas ?? []).forEach((f) => abertasMap.set(f.numero_nota, f));
 
-  const notasNaplanilha = new Set(linhas.map((l) => l.numero_nota));
+  // Deduplica linhas da planilha por numero_nota (mantém a última ocorrência)
+  const linhasDedup = new Map<string, LinhaImportacao>();
+  for (const l of linhas) linhasDedup.set(l.numero_nota, l);
+  const linhasUnicas = Array.from(linhasDedup.values());
+
+  const notasNaplanilha = new Set(linhasUnicas.map((l) => l.numero_nota));
+
+  const statusAberto = (s: string) => s !== "recebida" && s !== "cancelada";
 
   // Faturas abertas que NÃO estão na planilha → quitadas
   for (const [nota, fatura] of abertasMap.entries()) {
-    if (!notasNaplanilha.has(nota)) {
+    if (statusAberto(fatura.status) && !notasNaplanilha.has(nota)) {
       const { error } = await supabase
         .from("faturas")
         .update({ status: "recebida", updated_at: new Date().toISOString() })
@@ -158,14 +164,14 @@ export async function importarFaturas(
   }
 
   // Processa cada linha da planilha
-  for (const linha of linhas) {
+  for (const linha of linhasUnicas) {
     if (!linha.numero_nota || !linha.cliente) continue;
 
     const mesRef = linha.data_vencimento.slice(0, 7); // YYYY-MM
 
     const existente = abertasMap.get(linha.numero_nota);
 
-    if (existente) {
+    if (existente && statusAberto(existente.status)) {
       // Atualiza se valor ou vencimento mudou
       const mesmoValor = Math.abs(existente.valor - linha.valor) < 0.01;
       const mesmoVenc  = existente.data_vencimento === linha.data_vencimento;
@@ -177,6 +183,21 @@ export async function importarFaturas(
         if (error) resultado.erros.push(`Erro ao atualizar ${linha.numero_nota}: ${error.message}`);
         else resultado.atualizadas++;
       }
+    } else if (existente) {
+      // Fatura existe mas estava recebida/cancelada → reabre com dados atualizados
+      const { error } = await supabase
+        .from("faturas")
+        .update({
+          cliente: linha.cliente,
+          valor: linha.valor,
+          data_vencimento: linha.data_vencimento,
+          mes_referencia: mesRef,
+          status: "pendente",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existente.id);
+      if (error) resultado.erros.push(`Erro ao reabrir ${linha.numero_nota}: ${error.message}`);
+      else resultado.criadas++;
     } else {
       // Cria nova fatura
       const { error } = await supabase.from("faturas").insert({
@@ -188,8 +209,28 @@ export async function importarFaturas(
         valor: linha.valor,
         status: "pendente",
       });
-      if (error) resultado.erros.push(`Erro ao criar ${linha.numero_nota}: ${error.message}`);
-      else resultado.criadas++;
+      if (error) {
+        if (error.code === "23505") {
+          // Registro existe mas não estava visível no SELECT (ex: RLS) → reabre pelo numero_nota
+          const { error: errUpd } = await supabase
+            .from("faturas")
+            .update({
+              cliente: linha.cliente,
+              valor: linha.valor,
+              data_vencimento: linha.data_vencimento,
+              mes_referencia: mesRef,
+              status: "pendente",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("numero_nota", linha.numero_nota);
+          if (errUpd) resultado.erros.push(`Erro ao reabrir ${linha.numero_nota}: ${errUpd.message}`);
+          else resultado.criadas++;
+        } else {
+          resultado.erros.push(`Erro ao criar ${linha.numero_nota}: ${error.message}`);
+        }
+      } else {
+        resultado.criadas++;
+      }
     }
   }
 
